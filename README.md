@@ -23,7 +23,15 @@ android/    Android app (Kotlin + Jetpack Compose) — not started yet
 
 ## Pipeline
 
-Requires Python 3.12, no third-party packages. See [pipeline/README.md](pipeline/README.md).
+Requires Python 3.12, no third-party packages.
+
+```sh
+cd pipeline
+python3 -m unittest            # run the tests
+python3 -m fuel_pipeline       # download MIMIT data, write out/stations.json + out/meta.json
+```
+
+Details, cleaning rules and the JSON format: [pipeline/README.md](pipeline/README.md).
 
 ## Android app
 
