@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Pipeline: downloaded raw files and generated output (published by CI, never committed)
+pipeline/data/
+pipeline/out/
+
+# --- Android / Gradle ---
+.gradle/
+build/
+local.properties
+secrets.properties
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+
+# Signing keys
+*.jks
+*.keystore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# --- Secrets ---
+.env
+.env.*
+
+# --- OS ---
+.DS_Store
+Thumbs.db
