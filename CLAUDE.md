@@ -99,12 +99,31 @@ small enough to be tested on a real phone before moving on.
 ## Android app (/android)
 
 - Kotlin, Jetpack Compose, Material 3, single-activity, MVVM
-  (ViewModel + StateFlow). Min SDK 26 unless there is a reason to change.
-- Maps: Google Maps via `maps-compose` + `maps-compose-utils` for marker
-  clustering (24k points: clustering is mandatory).
-- API key: loaded through the Secrets Gradle Plugin from `local.properties`;
-  never hard-coded or committed. Document key restriction (package name +
-  SHA-1) in the README.
+  (ViewModel + StateFlow). Package `io.github.filbeq.fuelup`, app name FuelUp.
+- Toolchain: AGP 9 (Kotlin is built in: do not apply `org.jetbrains.kotlin.android`),
+  Compose compiler plugin matching the Kotlin version, version catalog in
+  `gradle/libs.versions.toml`. minSdk 26, targetSdk 36, compileSdk 37 (required
+  by current AndroidX). Open/build the `android/` folder, not the repo root.
+- Theme: fixed FuelUp light/dark palette (follows the system dark setting);
+  no dynamic colour.
+- Maps: MapLibre Native for Android (`org.maplibre.gl:android-sdk`) wrapped in
+  Compose with `AndroidView` around `MapView`, kept in a single file. Chosen
+  over the `maplibre-compose` wrapper, which is pre-1.0 with frequent breaking
+  releases; reconsider once it reaches 1.0.
+- Tiles: OpenFreeMap vector styles (`liberty` light, `dark` dark), no API key.
+  Style URLs and attribution live in one place (`map/MapProvider.kt`,
+  `CurrentMapProvider`) so the provider (e.g. MapTiler) can be swapped by
+  changing a single constant. A provider that needs a key must keep it out of git.
+- Clustering (step 4): 24k points, clustering is mandatory. Use MapLibre's
+  built-in GeoJSON source clustering (`GeoJsonOptions().withCluster(true)`),
+  not per-marker annotations.
+- Map attribution: "© OpenStreetMap contributors" plus the tile provider
+  (OpenFreeMap, © OpenMapTiles) always visible in a corner of the map (OSMF
+  guidelines), and listed with links in the About screen. MapLibre's own
+  attribution button and logo are disabled to avoid duplicates.
+- MapLibre's library manifest declares location permissions: they are removed
+  in our manifest (`tools:node="remove"`) until the "near me" step.
+- No API keys or secrets are needed by the app.
 - Data: download the published JSON at most once a day, cache it on device
   (Room or a plain file — choose the simplest that works), work offline
   from cache, show the data date and a clear error state.
@@ -116,16 +135,19 @@ small enough to be tested on a real phone before moving on.
     (e.g. `1,849 €/l` vs `€1.849/l`, and `1,794 €/kg` for methane)
   - fuel type labels come from string resources keyed by the enum;
     station names/addresses stay as provided by MIMIT
+- Per-app language picker only exists on Android 13+; on older Android the
+  app follows the system language (an in-app picker may come with UI polish).
 - Location permission: request only when the user taps "near me"; the app
-  must work without it.
+  must work without it. Re-add the location permissions removed from
+  MapLibre's manifest at that step.
 - No analytics, no tracking, no personal data collected.
 
 ## Roadmap (MVP first, one step at a time)
 
 1. Pipeline script producing clean JSON locally, with tests.
 2. GitHub Action + GitHub Pages publishing.
-3. Android skeleton: builds, runs, shows a Google Map, i18n set up.
-4. Load JSON, show clustered station markers.
+3. Android skeleton: builds, runs, shows a MapLibre map (OpenFreeMap), i18n set up.
+4. Load JSON, show clustered station markers (MapLibre GeoJSON clustering).
 5. Station detail: prices per fuel, self/served, last update date.
 6. Fuel filter + marker colors by relative price (cheap → expensive).
 7. "Near me" with location permission.
