@@ -37,3 +37,9 @@ captures/
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# --- Android extras ---
+.kotlin/
+*.hprof
+*.apks
+android/app/release/
