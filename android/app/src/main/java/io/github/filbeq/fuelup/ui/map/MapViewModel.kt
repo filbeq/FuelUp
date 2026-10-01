@@ -1,15 +1,15 @@
 package io.github.filbeq.fuelup.ui.map
 
-import android.annotation.SuppressLint
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.filbeq.fuelup.BuildConfig
+import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.data.HttpFetcher
 import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.StationRepository
+import io.github.filbeq.fuelup.map.StationLayers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +24,8 @@ import java.io.File
 data class MapUiState(
     /** The data on screen; null until the cache is read or the first download ends. */
     val snapshot: Snapshot? = null,
+    /** [snapshot]'s stations as GeoJSON for the map, built off the main thread. */
+    val stationsGeoJson: String? = null,
     val status: DataStatus = DataStatus.Loading,
 )
 
@@ -52,7 +54,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         StationRepository(
             dir = File(application.filesDir, "data"),
             fetcher = HttpFetcher(userAgent = "FuelUp/${BuildConfig.VERSION_NAME} (Android)"),
-            trace = { label, ms -> perfLog("$label: $ms ms") },
+            trace = { label, ms -> PerfLog.log("$label: $ms ms") },
         )
     }
 
@@ -63,8 +65,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshJob = viewModelScope.launch {
-            val cached = withContext(Dispatchers.IO) { withHeapLog("cache") { repository.loadCached() } }
-            _state.value = MapUiState(cached, DataStatus.Loading)
+            val cached = withContext(Dispatchers.IO) { PerfLog.timeWithHeap("cache") { repository.loadCached() } }
+            _state.value = MapUiState(cached, cached?.let { geoJson(it) }, DataStatus.Loading)
             refresh(force = false)
         }
     }
@@ -79,12 +81,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(status = DataStatus.Loading) }
         val current = _state.value.snapshot
         val result = withContext(Dispatchers.IO) {
-            withHeapLog("refresh") { repository.refresh(current, force) }
+            PerfLog.timeWithHeap("refresh") { repository.refresh(current, force) }
         }
+        val updatedGeoJson = (result as? RefreshResult.Updated)?.let { geoJson(it.snapshot) }
         _state.update {
             when (result) {
                 RefreshResult.UpToDate -> it.copy(status = DataStatus.Ready)
-                is RefreshResult.Updated -> MapUiState(result.snapshot, DataStatus.Ready)
+                is RefreshResult.Updated -> MapUiState(result.snapshot, updatedGeoJson, DataStatus.Ready)
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
                 RefreshResult.Failed -> it.copy(status = DataStatus.Failed)
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
@@ -92,32 +95,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private inline fun <T> withHeapLog(label: String, block: () -> T): T {
-        if (!BuildConfig.DEBUG) return block()
-        val runtime = Runtime.getRuntime()
-        // Collect garbage first so the numbers show memory actually kept (debug only).
-        runtime.gc()
-        val before = runtime.totalMemory() - runtime.freeMemory()
-        val start = System.nanoTime()
-        val result = block()
-        val elapsed = (System.nanoTime() - start) / 1_000_000
-        runtime.gc()
-        val after = runtime.totalMemory() - runtime.freeMemory()
-        perfLog(
-            "$label: $elapsed ms total, Java heap kept ${before / MB} → ${after / MB} MB " +
-                "(max ${runtime.maxMemory() / MB} MB)",
-        )
-        return result
-    }
-
-    private companion object {
-        const val MB = 1024 * 1024
-
-        // Plain Log on purpose: "use Timber" comes from MapLibre's lint rules, and
-        // these lines only exist in debug builds.
-        @SuppressLint("LogNotTimber")
-        fun perfLog(message: String) {
-            if (BuildConfig.DEBUG) Log.d("FuelUpPerf", message)
-        }
+    private suspend fun geoJson(snapshot: Snapshot): String = withContext(Dispatchers.Default) {
+        PerfLog.time("build GeoJSON") { StationLayers.buildGeoJson(snapshot.stations.stations) }
     }
 }

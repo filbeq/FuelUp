@@ -3,7 +3,10 @@ package io.github.filbeq.fuelup.map
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Modifier
@@ -44,10 +47,17 @@ fun MapLibreMap(
     styleUrl: String,
     camera: MapCamera,
     onCameraIdle: (MapCamera) -> Unit,
+    /** Stations as GeoJSON (see [StationLayers.buildGeoJson]); null = none yet. */
+    stationsGeoJson: String?,
+    stationColors: StationColors,
+    labelFont: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
+    val currentColors = rememberUpdatedState(stationColors)
+    // The style currently on screen, once fully loaded (null while loading).
+    var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember {
         val options = MapLibreMapOptions.createFromAttributes(context)
             .camera(
@@ -72,7 +82,18 @@ fun MapLibreMap(
     }
 
     LaunchedEffect(mapView, styleUrl) {
-        mapView.getMapAsync { map -> map.setStyle(Style.Builder().fromUri(styleUrl)) }
+        loadedStyle = null
+        mapView.getMapAsync { map ->
+            map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
+                // A new style starts empty: add our source and layers every time.
+                StationLayers.addTo(style, currentColors.value, labelFont)
+                loadedStyle = style
+            }
+        }
+    }
+
+    LaunchedEffect(loadedStyle, stationsGeoJson) {
+        loadedStyle?.let { StationLayers.setData(it, stationsGeoJson) }
     }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle

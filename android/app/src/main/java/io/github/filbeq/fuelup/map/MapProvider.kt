@@ -10,6 +10,8 @@ data class MapAttribution(@StringRes val label: Int, val url: String)
 data class MapProvider(
     val lightStyleUrl: String,
     val darkStyleUrl: String,
+    /** A font the style's glyph server provides, for our own labels (cluster counts). */
+    val labelFont: String,
     val attributions: List<MapAttribution>,
 )
 
@@ -17,6 +19,7 @@ data class MapProvider(
 val OpenFreeMap = MapProvider(
     lightStyleUrl = "https://tiles.openfreemap.org/styles/liberty",
     darkStyleUrl = "https://tiles.openfreemap.org/styles/dark",
+    labelFont = "Noto Sans Bold",
     attributions = listOf(
         MapAttribution(R.string.attribution_openfreemap, "https://openfreemap.org"),
         MapAttribution(R.string.attribution_openmaptiles, "https://www.openmaptiles.org"),

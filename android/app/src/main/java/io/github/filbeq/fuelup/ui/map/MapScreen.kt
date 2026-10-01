@@ -16,6 +16,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.map.MapLibreMap
+import io.github.filbeq.fuelup.map.StationColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +57,13 @@ fun MapScreen(
                 styleUrl = if (isSystemInDarkTheme()) provider.darkStyleUrl else provider.lightStyleUrl,
                 camera = camera,
                 onCameraIdle = onCameraChange,
+                stationsGeoJson = state.stationsGeoJson,
+                stationColors = StationColors(
+                    fill = MaterialTheme.colorScheme.primary.toArgb(),
+                    text = MaterialTheme.colorScheme.onPrimary.toArgb(),
+                    stroke = MaterialTheme.colorScheme.surface.toArgb(),
+                ),
+                labelFont = provider.labelFont,
                 modifier = Modifier.fillMaxSize(),
             )
             DataStatusCard(
