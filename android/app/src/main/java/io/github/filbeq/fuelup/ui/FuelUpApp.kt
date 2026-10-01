@@ -39,6 +39,7 @@ fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
             onCameraChange = { camera = it },
             selectedStationId = selectedStationId,
             onStationClick = { selectedStationId = it },
+            onDismissStation = { selectedStationId = null },
             onOpenAbout = { showAbout = true },
         )
     }

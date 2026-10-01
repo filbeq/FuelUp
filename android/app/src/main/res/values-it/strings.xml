@@ -35,4 +35,29 @@
     <string name="error_download_failed">Impossibile scaricare i prezzi. Riprova più tardi.</string>
     <string name="error_update_required">Serve una versione più recente di FuelUp per leggere i prezzi aggiornati. Aggiorna l\'app.</string>
     <string name="action_retry">Riprova</string>
+
+    <!-- Scheda distributore -->
+    <string name="fuel_petrol">Benzina</string>
+    <string name="fuel_diesel">Gasolio</string>
+    <string name="fuel_lpg">GPL</string>
+    <string name="fuel_cng">Metano</string>
+    <string name="fuel_lng">GNL</string>
+    <string name="fuel_other">Altro</string>
+    <string name="price_per_litre">%1$s €/l</string>
+    <string name="price_per_kg">%1$s €/kg</string>
+    <string name="price_not_available">Non disponibile</string>
+    <string name="mode_self">Self</string>
+    <string name="mode_served">Servito</string>
+    <string name="station_fuel_column">Carburante</string>
+    <string name="station_motorway">Autostrada</string>
+    <string name="reported_today">Comunicato oggi</string>
+    <string name="reported_yesterday">Comunicato ieri</string>
+    <plurals name="reported_days_ago">
+        <item quantity="one">Comunicato %d giorno fa</item>
+        <item quantity="many">Comunicato %d giorni fa</item>
+        <item quantity="other">Comunicato %d giorni fa</item>
+    </plurals>
+    <string name="reported_at_description">%1$s, comunicato il %2$s alle %3$s</string>
+    <string name="action_navigate">Naviga</string>
+    <string name="error_no_navigation_app">Nessuna app di navigazione installata</string>
 </resources>

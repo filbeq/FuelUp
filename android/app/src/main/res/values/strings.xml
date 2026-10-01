@@ -40,4 +40,30 @@
     <string name="error_download_failed">Couldn\'t download prices. Try again later.</string>
     <string name="error_update_required">A newer version of FuelUp is needed to read the latest prices. Please update the app.</string>
     <string name="action_retry">Retry</string>
+
+    <!-- Station sheet -->
+    <string name="fuel_petrol">Petrol</string>
+    <string name="fuel_diesel">Diesel</string>
+    <string name="fuel_lpg">LPG</string>
+    <string name="fuel_cng">Methane</string>
+    <string name="fuel_lng">LNG</string>
+    <string name="fuel_other">Other</string>
+    <!-- %1$s = price with 3 decimals, already in the app's number format -->
+    <string name="price_per_litre">€%1$s/l</string>
+    <string name="price_per_kg">€%1$s/kg</string>
+    <string name="price_not_available">Not available</string>
+    <string name="mode_self">Self</string>
+    <string name="mode_served">Served</string>
+    <string name="station_fuel_column">Fuel</string>
+    <string name="station_motorway">Motorway</string>
+    <string name="reported_today">Reported today</string>
+    <string name="reported_yesterday">Reported yesterday</string>
+    <plurals name="reported_days_ago">
+        <item quantity="one">Reported %d day ago</item>
+        <item quantity="other">Reported %d days ago</item>
+    </plurals>
+    <!-- For screen readers: %1$s = price, %2$s = date, %3$s = time -->
+    <string name="reported_at_description">%1$s, reported on %2$s at %3$s</string>
+    <string name="action_navigate">Navigate</string>
+    <string name="error_no_navigation_app">No navigation app installed</string>
 </resources>
