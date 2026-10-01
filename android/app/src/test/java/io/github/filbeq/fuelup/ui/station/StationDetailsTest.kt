@@ -1,6 +1,7 @@
 package io.github.filbeq.fuelup.ui.station
 
 import io.github.filbeq.fuelup.data.Fuel
+import io.github.filbeq.fuelup.data.FuelKind
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationDataJson

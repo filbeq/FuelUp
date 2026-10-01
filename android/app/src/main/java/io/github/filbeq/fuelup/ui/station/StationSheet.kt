@@ -40,7 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.data.FuelKind
 import io.github.filbeq.fuelup.data.RefreshPolicy
+import io.github.filbeq.fuelup.ui.map.fuelLabel
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -222,16 +224,7 @@ private fun formatPrice(price: PriceInfo, perKg: Boolean): String {
 }
 
 @Composable
-private fun kindLabel(kind: FuelKind): String = stringResource(
-    when (kind) {
-        FuelKind.PETROL -> R.string.fuel_petrol
-        FuelKind.DIESEL -> R.string.fuel_diesel
-        FuelKind.LPG -> R.string.fuel_lpg
-        FuelKind.CNG -> R.string.fuel_cng
-        FuelKind.LNG -> R.string.fuel_lng
-        FuelKind.OTHER -> R.string.fuel_other
-    },
-)
+private fun kindLabel(kind: FuelKind): String = stringResource(fuelLabel(kind))
 
 /**
  * Opens the station in whatever navigation app the user has (a standard `geo:`

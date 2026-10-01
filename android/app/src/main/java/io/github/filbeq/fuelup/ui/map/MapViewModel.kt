@@ -5,10 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.filbeq.fuelup.BuildConfig
 import io.github.filbeq.fuelup.PerfLog
+import io.github.filbeq.fuelup.data.FuelChoice
+import io.github.filbeq.fuelup.data.FuelChoiceStore
 import io.github.filbeq.fuelup.data.HttpFetcher
 import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.StationRepository
+import io.github.filbeq.fuelup.data.priceFor
+import io.github.filbeq.fuelup.data.standardFuelIndices
 import io.github.filbeq.fuelup.map.StationLayers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +31,8 @@ data class MapUiState(
     /** [snapshot]'s stations as GeoJSON for the map, built off the main thread. */
     val stationsGeoJson: String? = null,
     val status: DataStatus = DataStatus.Loading,
+    /** Which fuel the map shows; remembered across launches. */
+    val choice: FuelChoice = FuelChoice.Default,
 )
 
 enum class DataStatus {
@@ -58,6 +64,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private val choiceStore by lazy {
+        FuelChoiceStore(application.getSharedPreferences("settings", Application.MODE_PRIVATE))
+    }
+
     private val _state = MutableStateFlow(MapUiState())
     val state: StateFlow<MapUiState> = _state.asStateFlow()
 
@@ -65,9 +75,23 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshJob = viewModelScope.launch {
+            val choice = withContext(Dispatchers.IO) { choiceStore.load() }
             val cached = withContext(Dispatchers.IO) { PerfLog.timeWithHeap("cache") { repository.loadCached() } }
-            _state.value = MapUiState(cached, cached?.let { geoJson(it) }, DataStatus.Loading)
+            _state.value = MapUiState(cached, cached?.let { geoJson(it, choice) }, DataStatus.Loading, choice)
             refresh(force = false)
+        }
+    }
+
+    /** The user picked another fuel or service mode: remember it and redraw the map. */
+    fun setChoice(choice: FuelChoice) {
+        if (choice == _state.value.choice) return
+        _state.update { it.copy(choice = choice) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { choiceStore.save(choice) }
+            val snapshot = _state.value.snapshot ?: return@launch
+            val geoJson = geoJson(snapshot, choice)
+            // Ignore a result that arrives after the user already picked something else.
+            _state.update { if (it.choice == choice && it.snapshot === snapshot) it.copy(stationsGeoJson = geoJson) else it }
         }
     }
 
@@ -83,11 +107,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val result = withContext(Dispatchers.IO) {
             PerfLog.timeWithHeap("refresh") { repository.refresh(current, force) }
         }
-        val updatedGeoJson = (result as? RefreshResult.Updated)?.let { geoJson(it.snapshot) }
+        val choice = _state.value.choice
+        val updatedGeoJson = (result as? RefreshResult.Updated)?.let { geoJson(it.snapshot, choice) }
         _state.update {
             when (result) {
                 RefreshResult.UpToDate -> it.copy(status = DataStatus.Ready)
-                is RefreshResult.Updated -> MapUiState(result.snapshot, updatedGeoJson, DataStatus.Ready)
+                is RefreshResult.Updated -> it.copy(
+                    snapshot = result.snapshot,
+                    stationsGeoJson = updatedGeoJson,
+                    status = DataStatus.Ready,
+                )
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
                 RefreshResult.Failed -> it.copy(status = DataStatus.Failed)
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
@@ -95,7 +124,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun geoJson(snapshot: Snapshot): String = withContext(Dispatchers.Default) {
-        PerfLog.time("build GeoJSON") { StationLayers.buildGeoJson(snapshot.stations.stations) }
+    private suspend fun geoJson(snapshot: Snapshot, choice: FuelChoice): String = withContext(Dispatchers.Default) {
+        PerfLog.time("build GeoJSON (${choice.fuel} ${choice.mode})") {
+            val indices = snapshot.stations.standardFuelIndices(choice.fuel)
+            StationLayers.buildGeoJson(snapshot.stations.stations) { it.priceFor(choice, indices) }
+        }
     }
 }

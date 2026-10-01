@@ -3,6 +3,7 @@ package io.github.filbeq.fuelup.map
 import android.graphics.PointF
 import android.graphics.RectF
 import io.github.filbeq.fuelup.PerfLog
+import io.github.filbeq.fuelup.data.ChosenPrice
 import io.github.filbeq.fuelup.data.Station
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -61,23 +62,29 @@ object StationLayers {
     private const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
     /**
-     * GeoJSON with one point per station: coordinates plus the station id as a
-     * number property (MapLibre returns feature ids as text, so the property is
-     * what tap handling reads). Details come from the parsed data.
+     * GeoJSON with one point per station that sells the chosen fuel ([priceOf]
+     * returns null for the others, which are left out). Properties: the station
+     * id as a number (MapLibre returns feature ids as text, so tap handling
+     * reads this) and `p`, the price in thousandths of a euro.
      * Built as a string: MapLibre parses it natively, without creating ~21k
      * Java objects.
      */
-    fun buildGeoJson(stations: List<Station>): String = buildString(stations.size * 110) {
-        append("""{"type":"FeatureCollection","features":[""")
-        stations.forEachIndexed { index, station ->
-            if (index > 0) append(',')
-            append("""{"type":"Feature","id":""").append(station.id)
-            append(""","geometry":{"type":"Point","coordinates":[""")
-            append(station.lon).append(',').append(station.lat)
-            append("""]},"properties":{"id":""").append(station.id).append("}}")
+    fun buildGeoJson(stations: List<Station>, priceOf: (Station) -> ChosenPrice?): String =
+        buildString(stations.size * 120) {
+            append("""{"type":"FeatureCollection","features":[""")
+            var first = true
+            for (station in stations) {
+                val price = priceOf(station) ?: continue
+                if (!first) append(',')
+                first = false
+                append("""{"type":"Feature","id":""").append(station.id)
+                append(""","geometry":{"type":"Point","coordinates":[""")
+                append(station.lon).append(',').append(station.lat)
+                append("""]},"properties":{"id":""").append(station.id)
+                append(""","p":""").append(price.priceMilli).append("}}")
+            }
+            append("]}")
         }
-        append("]}")
-    }
 
     /** Adds the source and layers to a freshly loaded style (initially empty). */
     fun addTo(style: Style, colors: StationColors, font: String) {

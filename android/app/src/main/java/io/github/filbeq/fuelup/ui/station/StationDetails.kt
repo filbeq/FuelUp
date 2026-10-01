@@ -1,20 +1,11 @@
 package io.github.filbeq.fuelup.ui.station
 
+import io.github.filbeq.fuelup.data.FuelKind
 import io.github.filbeq.fuelup.data.PriceEntry
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationsFile
 import java.time.Instant
-
-/** Fuel families, matching the pipeline's `type` values. */
-enum class FuelKind {
-    PETROL, DIESEL, LPG, CNG, LNG, OTHER;
-
-    companion object {
-        /** Unknown future types are shown as OTHER instead of failing. */
-        fun of(type: String): FuelKind = entries.firstOrNull { it.name == type } ?: OTHER
-    }
-}
 
 /** One price at a station. */
 data class PriceInfo(val priceMilli: Long, val updated: Instant)

@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.LabelLanguage
 import io.github.filbeq.fuelup.map.MapCamera
@@ -70,6 +71,7 @@ import kotlin.math.roundToInt
 fun MapScreen(
     state: MapUiState,
     onRetry: () -> Unit,
+    onChoiceChange: (FuelChoice) -> Unit,
     camera: MapCamera,
     onCameraChange: (MapCamera) -> Unit,
     selectedStationId: Int?,
@@ -182,11 +184,10 @@ fun MapScreen(
                 onStationClick = onStationClick,
                 modifier = Modifier.fillMaxSize(),
             )
-            DataStatusCard(
-                state = state,
-                onRetry = onRetry,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                FuelSelector(choice = state.choice, onChoiceChange = onChoiceChange)
+                DataStatusCard(state = state, onRetry = onRetry)
+            }
             MapAttributionBar(
                 onClick = onOpenAbout,
                 modifier = Modifier

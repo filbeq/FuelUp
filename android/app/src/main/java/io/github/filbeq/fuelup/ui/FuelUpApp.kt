@@ -35,6 +35,7 @@ fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
         MapScreen(
             state = mapState,
             onRetry = mapViewModel::retry,
+            onChoiceChange = mapViewModel::setChoice,
             camera = camera,
             onCameraChange = { camera = it },
             selectedStationId = selectedStationId,
