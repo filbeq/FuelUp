@@ -76,6 +76,10 @@ fun AboutScreen(onBack: () -> Unit) {
             Link(stringResource(R.string.about_open_dataset), DATASET_URL)
             Link(stringResource(R.string.about_open_license), LICENSE_URL)
 
+            Section(R.string.about_compare_title)
+            Body(R.string.about_compare_body)
+            Body(R.string.about_compare_verify)
+
             Section(R.string.about_map_title)
             Body(R.string.about_map_body)
             CurrentMapProvider.attributions.forEach { Link(stringResource(it.label), it.url) }

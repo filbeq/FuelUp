@@ -11,9 +11,10 @@ the Italian Ministry of Enterprises and Made in Italy (MIMIT).
 
 Early development, not yet on the Play Store. Today the app shows every
 station in Italy on the map (grouped when zoomed out) and works offline with
-the last downloaded data. Tap a station to see its prices per fuel, self and
-served, when each price was last reported, and to start navigation in your
-favourite maps app. Price colours and a fuel filter are coming next.
+the last downloaded data. Pick your fuel (and self or served) and each station
+is marked cheap, average or expensive compared with the stations around it, with
+prices shown on the map. Tap a station to see all its prices, when each was last
+reported, and to start navigation in your favourite maps app.
 
 Planned features:
 

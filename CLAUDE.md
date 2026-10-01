@@ -123,6 +123,18 @@ small enough to be tested on a real phone before moving on.
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
   no Google dependency).
+- Fuel filter (step 6): standard product per type; Self/Servito only for petrol
+  and diesel (LPG/methane/LNG are ~90–97% served-only); stations not selling the
+  choice are hidden (not greyed); choice saved in SharedPreferences.
+- Price colours: compare with the median of the 25 nearest stations (same
+  fuel/mode, 50 km), classify by cents (±2 c), never by rank (prices are clumped,
+  e.g. Eni 1.990 nationwide). Separate groups: motorway (8 nearest, 100 km) and
+  duty-free Livigno. Prices ≥ 35 c below (GPL 20, CNG/LNG 50) are "to verify":
+  visible, never "cheap", excluded from cluster "from" prices. Thresholds per
+  fuel in `PriceRanking.THRESHOLDS`. Colours never depend on the visible area.
+- Colour-blind safety: every class has a distinct marker shape and the sheet
+  says it in words; colour is never the only signal.
+- Debug builds are arm64-only to keep installs small; release keeps all ABIs.
 - Theme: fixed FuelUp light/dark palette (follows the system dark setting);
   no dynamic colour.
 - Maps: MapLibre Native for Android (`org.maplibre.gl:android-sdk`) wrapped in

@@ -78,4 +78,9 @@
     <string name="compare_group_road">della zona</string>
     <string name="compare_group_motorway">delle aree di servizio vicine</string>
     <string name="compare_group_duty_free">della zona extradoganale</string>
+
+    <!-- Informazioni: come si confrontano i prezzi -->
+    <string name="about_compare_title">Come si confrontano i prezzi</string>
+    <string name="about_compare_body">Ogni distributore è confrontato con il prezzo tipico (mediano) dei 25 distributori più vicini che vendono lo stesso carburante, entro 50 km: almeno 2 cent in meno è economico, almeno 2 cent in più è caro. Le aree di servizio autostradali sono confrontate solo tra loro, così come i distributori della zona extradoganale di Livigno.</string>
+    <string name="about_compare_verify">Un prezzo molto più basso di quello tipico (35 cent per benzina e gasolio) è segnato \"da verificare\": potrebbe essere un errore di comunicazione, quindi verificalo alla pompa.</string>
 </resources>

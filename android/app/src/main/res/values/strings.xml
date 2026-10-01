@@ -87,4 +87,9 @@
     <string name="compare_group_road">nearby</string>
     <string name="compare_group_motorway">at nearby motorway service areas</string>
     <string name="compare_group_duty_free">in the duty-free area</string>
+
+    <!-- About: how prices are compared -->
+    <string name="about_compare_title">How prices are compared</string>
+    <string name="about_compare_body">Each station is compared with the typical (median) price of the 25 nearest stations selling the same fuel, within 50 km: 2 cents or more below is cheap, 2 cents or more above is expensive. Motorway service areas are compared only with each other, as are stations in the duty-free area of Livigno.</string>
+    <string name="about_compare_verify">A price far below the typical one (35 cents for petrol and diesel) is marked \"to verify\": it may be a reporting error, so check it at the pump.</string>
 </resources>

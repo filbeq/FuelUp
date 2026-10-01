@@ -142,6 +142,10 @@ language instead.
 | `java/…/data/DataSource.kt` | Where the data is published (one URL) |
 | `java/…/map/StationLayers.kt` | Stations as clustered markers, selection ring, tap handling (cluster → zoom in, station → select) |
 | `java/…/map/LabelLanguage.kt` | Map place names in the app language |
+| `java/…/map/StationIcons.kt` | Marker icons per price class (colour + shape), also used by the legend |
+| `java/…/data/FuelChoice.kt` | Chosen fuel/mode, its price per station, saved choice |
+| `java/…/data/PriceRanking.kt` | Price comparison with nearby stations (constants in one place) |
+| `java/…/ui/map/FuelSelector.kt` | Fuel chips, Self/Servito toggle, legend |
 | `java/…/ui/station/StationDetails.kt` | Station + prices per fuel, from the cached data (pure Kotlin) |
 | `java/…/ui/station/PriceFormat.kt` | Price numbers and "days since reported" |
 | `java/…/ui/station/StationSheet.kt` | Station sheet content and the Navigate (`geo:`) intent |
@@ -200,6 +204,58 @@ Release builds will be faster.
 To see the timings yourself: `adb logcat -s FuelUpPerf` (debug builds only).
 Debug builds also enable StrictMode, which logs any disk or network access on
 the main thread (MapLibre's own start-up shows up there; our code doesn't).
+
+### Fuel filter and price comparison
+
+**Fuel choice.** Chips for the standard product of each type (Benzina, Gasolio,
+GPL, Metano incl. L-GNC, GNL); special products like "Blue Super" don't count.
+Self/Servito only for petrol and diesel: on 30/09/2026, LPG, methane and LNG were
+89–97% served-only (GPL self: 152 of 4,530 stations). Stations not selling the
+choice are removed from the map, so clusters and their "from" prices only count
+relevant stations. Saved in `SharedPreferences`; default Benzina self.
+
+**Comparison** (`data/PriceRanking.kt`). For each station, the median price of
+its **25 nearest** stations selling the same fuel/mode **within 50 km**, then the
+difference in cents:
+
+| Difference from the local median | Class | Marker |
+|---|---|---|
+| ≥ 2 c below | cheap | green `#009E73`, down chevron |
+| within ±2 c | average | light grey, plain |
+| ≥ 2 c above | expensive | vermillion `#D55E00`, up chevron |
+| ≥ 35 c below (petrol/diesel; GPL 20 c, methane/LNG 50 c) | to verify | grey, "?" |
+| fewer than 5 neighbours within 50 km | not compared | hollow |
+
+Why this way (all measured on 30/09/2026 data):
+- **Nearest stations, not the visible area:** colours must not change while
+  panning; it depends only on the data and the fuel choice. The 25th
+  neighbour is ~2–3 km away in cities, ~8 km in the median case, ~18 km in the
+  countryside, so it adapts to density, unlike a fixed radius or provinces.
+- **Cents, not ranks:** prices are clumped. Agip Eni sells petrol at exactly 1.990
+  at 3,171 of 3,847 stations, 10–20 c under local prices. Percentiles would
+  call a station 1 c above an Eni "expensive".
+- **Groups:** motorway stations are compared only with each other (8 nearest,
+  100 km), since their median is ~5.5 c higher. **Livigno** (duty-free, ~50 c
+  cheaper) is compared only with itself; otherwise every Livigno station would be
+  "to verify".
+- **To verify:** the brand-priced stations sit at 10–20 c below; from ~35 c
+  it's mostly scattered unbranded stations at 1.56–1.62 €/l. Petrol self: 103
+  stations flagged, diesel self: 115 (~0.5%). Flagged prices stay visible but
+  are never coloured cheap and never become a cluster's "from" price.
+- Result for petrol self, ordinary roads: 36% cheap, 26% average, 37%
+  expensive. The band and outlier thresholds are per fuel in
+  `PriceRanking.THRESHOLDS`, ready to be tuned separately.
+
+**Colour-blind safety.** Shape always carries the class; colour is extra. The
+light grey for "average" differs in lightness from both colours, checked with
+protanopia/deuteranopia/tritanopia simulations of screenshots.
+
+**Performance** (Redmi Note 9 Pro, debug build): ranking all stations for a
+fuel takes 200–260 ms on a background thread (spread over the CPU cores), plus
+~35 ms to build the map data; nothing is recomputed while panning.
+
+**Debug builds are arm64-only** (~26 MB instead of ~62 MB). To use an x86_64
+emulator, add `"x86_64"` to `abiFilters` in `app/build.gradle.kts`.
 
 ### Localization rules
 
