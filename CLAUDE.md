@@ -20,6 +20,8 @@ small enough to be tested on a real phone before moving on.
   imperative mood, short subject line (≤ 60 chars), Conventional Commits prefix:
   `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, `ci:`.
   Example: `feat(android): cluster station markers on map`.
+- Docs: `README.md` is for users of the app (what it does, data notice,
+  privacy, credits); developer instructions go in `DEVELOPMENT.md`.
 - Never commit secrets (API keys, keystores, `local.properties`). Keep
   `.gitignore` up to date for both Python and Android/Gradle.
 - All code, identifiers, comments, docs and commit messages in English.
