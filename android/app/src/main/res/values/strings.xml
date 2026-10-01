@@ -66,4 +66,10 @@
     <string name="reported_at_description">%1$s, reported on %2$s at %3$s</string>
     <string name="action_navigate">Navigate</string>
     <string name="error_no_navigation_app">No navigation app installed</string>
+
+    <!-- Price legend (map) -->
+    <string name="legend_cheap">Cheap</string>
+    <string name="legend_average">Average</string>
+    <string name="legend_expensive">Expensive</string>
+    <string name="legend_to_verify">To verify</string>
 </resources>

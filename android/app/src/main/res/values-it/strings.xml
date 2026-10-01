@@ -60,4 +60,10 @@
     <string name="reported_at_description">%1$s, comunicato il %2$s alle %3$s</string>
     <string name="action_navigate">Naviga</string>
     <string name="error_no_navigation_app">Nessuna app di navigazione installata</string>
+
+    <!-- Legenda prezzi (mappa) -->
+    <string name="legend_cheap">Economico</string>
+    <string name="legend_average">Nella media</string>
+    <string name="legend_expensive">Caro</string>
+    <string name="legend_to_verify">Da verificare</string>
 </resources>

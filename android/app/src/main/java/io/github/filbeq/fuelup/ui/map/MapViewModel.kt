@@ -8,10 +8,11 @@ import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelChoiceStore
 import io.github.filbeq.fuelup.data.HttpFetcher
+import io.github.filbeq.fuelup.data.PriceRanking
+import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.StationRepository
-import io.github.filbeq.fuelup.data.priceFor
 import io.github.filbeq.fuelup.data.standardFuelIndices
 import io.github.filbeq.fuelup.map.StationLayers
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,8 @@ data class MapUiState(
     val status: DataStatus = DataStatus.Loading,
     /** Which fuel the map shows; remembered across launches. */
     val choice: FuelChoice = FuelChoice.Default,
+    /** Price and comparison for [choice], by station id (stations not selling it are absent). */
+    val ranking: Map<Int, RankedPrice> = emptyMap(),
 )
 
 enum class DataStatus {
@@ -77,7 +80,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         refreshJob = viewModelScope.launch {
             val choice = withContext(Dispatchers.IO) { choiceStore.load() }
             val cached = withContext(Dispatchers.IO) { PerfLog.timeWithHeap("cache") { repository.loadCached() } }
-            _state.value = MapUiState(cached, cached?.let { geoJson(it, choice) }, DataStatus.Loading, choice)
+            val prepared = cached?.let { prepare(it, choice) }
+            _state.value = MapUiState(cached, prepared?.geoJson, DataStatus.Loading, choice, prepared?.ranking.orEmpty())
             refresh(force = false)
         }
     }
@@ -89,9 +93,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { choiceStore.save(choice) }
             val snapshot = _state.value.snapshot ?: return@launch
-            val geoJson = geoJson(snapshot, choice)
+            val prepared = prepare(snapshot, choice)
             // Ignore a result that arrives after the user already picked something else.
-            _state.update { if (it.choice == choice && it.snapshot === snapshot) it.copy(stationsGeoJson = geoJson) else it }
+            _state.update {
+                if (it.choice == choice && it.snapshot === snapshot) {
+                    it.copy(stationsGeoJson = prepared.geoJson, ranking = prepared.ranking)
+                } else {
+                    it
+                }
+            }
         }
     }
 
@@ -108,13 +118,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             PerfLog.timeWithHeap("refresh") { repository.refresh(current, force) }
         }
         val choice = _state.value.choice
-        val updatedGeoJson = (result as? RefreshResult.Updated)?.let { geoJson(it.snapshot, choice) }
+        val prepared = (result as? RefreshResult.Updated)?.let { prepare(it.snapshot, choice) }
         _state.update {
             when (result) {
                 RefreshResult.UpToDate -> it.copy(status = DataStatus.Ready)
                 is RefreshResult.Updated -> it.copy(
                     snapshot = result.snapshot,
-                    stationsGeoJson = updatedGeoJson,
+                    stationsGeoJson = prepared?.geoJson,
+                    ranking = prepared?.ranking.orEmpty(),
                     status = DataStatus.Ready,
                 )
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
@@ -124,10 +135,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun geoJson(snapshot: Snapshot, choice: FuelChoice): String = withContext(Dispatchers.Default) {
-        PerfLog.time("build GeoJSON (${choice.fuel} ${choice.mode})") {
-            val indices = snapshot.stations.standardFuelIndices(choice.fuel)
-            StationLayers.buildGeoJson(snapshot.stations.stations) { it.priceFor(choice, indices) }
+    private class Prepared(val ranking: Map<Int, RankedPrice>, val geoJson: String)
+
+    /** Compares prices for [choice] and builds the map data, off the main thread. */
+    private suspend fun prepare(snapshot: Snapshot, choice: FuelChoice): Prepared = withContext(Dispatchers.Default) {
+        val stations = snapshot.stations.stations
+        val ranking = PerfLog.time("rank prices (${choice.fuel} ${choice.mode})") {
+            PriceRanking.rank(stations, choice, snapshot.stations.standardFuelIndices(choice.fuel))
         }
+        val geoJson = PerfLog.time("build GeoJSON") { StationLayers.buildGeoJson(stations, ranking) }
+        Prepared(ranking, geoJson)
     }
 }

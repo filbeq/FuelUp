@@ -173,8 +173,8 @@ fun MapScreen(
                 onCameraIdle = onCameraChange,
                 stationsGeoJson = state.stationsGeoJson,
                 stationColors = StationColors(
-                    fill = MaterialTheme.colorScheme.primary.toArgb(),
-                    text = MaterialTheme.colorScheme.onPrimary.toArgb(),
+                    clusterFill = MaterialTheme.colorScheme.secondaryContainer.toArgb(),
+                    clusterText = MaterialTheme.colorScheme.onSecondaryContainer.toArgb(),
                     stroke = MaterialTheme.colorScheme.surface.toArgb(),
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                 ),

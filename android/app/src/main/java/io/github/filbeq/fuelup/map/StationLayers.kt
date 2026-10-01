@@ -3,7 +3,8 @@ package io.github.filbeq.fuelup.map
 import android.graphics.PointF
 import android.graphics.RectF
 import io.github.filbeq.fuelup.PerfLog
-import io.github.filbeq.fuelup.data.ChosenPrice
+import io.github.filbeq.fuelup.data.PriceClass
+import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.Station
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -14,6 +15,7 @@ import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.has
 import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.not
 import org.maplibre.android.style.expressions.Expression.step
 import org.maplibre.android.style.expressions.Expression.stop
@@ -23,6 +25,9 @@ import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.textColor
 import org.maplibre.android.style.layers.PropertyFactory.textField
@@ -36,8 +41,11 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import kotlin.math.hypot
 
-/** Marker colours (ARGB), taken from the app theme. */
-data class StationColors(val fill: Int, val text: Int, val stroke: Int, val selected: Int)
+/**
+ * Colours (ARGB) from the app theme. Clusters are neutral on purpose: the brand
+ * green would read as "cheap". Station markers use [StationIcons].
+ */
+data class StationColors(val clusterFill: Int, val clusterText: Int, val stroke: Int, val selected: Int)
 
 /**
  * Stations on the map, grouped by MapLibre's built-in GeoJSON clustering:
@@ -50,6 +58,7 @@ object StationLayers {
     private const val STATION_LAYER_ID = "fuelup-station"
     private const val SELECTED_LAYER_ID = "fuelup-selected"
     private const val ID_PROPERTY = "id"
+    private const val CLASS_PROPERTY = "c"
     private const val NO_STATION = -1
 
     /** Taps this close to a marker count as a tap on it (markers are only 6 dp). */
@@ -62,32 +71,33 @@ object StationLayers {
     private const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
     /**
-     * GeoJSON with one point per station that sells the chosen fuel ([priceOf]
-     * returns null for the others, which are left out). Properties: the station
-     * id as a number (MapLibre returns feature ids as text, so tap handling
-     * reads this) and `p`, the price in thousandths of a euro.
+     * GeoJSON with one point per station that sells the chosen fuel (the
+     * stations missing from [ranked]). Properties: the station id as a number
+     * (MapLibre returns feature ids as text, so tap handling reads this), `p` =
+     * price in thousandths of a euro, `c` = [PriceClass] name.
      * Built as a string: MapLibre parses it natively, without creating ~21k
      * Java objects.
      */
-    fun buildGeoJson(stations: List<Station>, priceOf: (Station) -> ChosenPrice?): String =
-        buildString(stations.size * 120) {
+    fun buildGeoJson(stations: List<Station>, ranked: Map<Int, RankedPrice>): String =
+        buildString(stations.size * 140) {
             append("""{"type":"FeatureCollection","features":[""")
             var first = true
             for (station in stations) {
-                val price = priceOf(station) ?: continue
+                val price = ranked[station.id] ?: continue
                 if (!first) append(',')
                 first = false
                 append("""{"type":"Feature","id":""").append(station.id)
                 append(""","geometry":{"type":"Point","coordinates":[""")
                 append(station.lon).append(',').append(station.lat)
                 append("""]},"properties":{"id":""").append(station.id)
-                append(""","p":""").append(price.priceMilli).append("}}")
+                append(""","p":""").append(price.priceMilli)
+                append(""","c":"""").append(price.priceClass.name).append("\"}}")
             }
             append("]}")
         }
 
     /** Adds the source and layers to a freshly loaded style (initially empty). */
-    fun addTo(style: Style, colors: StationColors, font: String) {
+    fun addTo(style: Style, colors: StationColors, font: String, density: Float) {
         val options = GeoJsonOptions()
             .withCluster(true)
             .withClusterMaxZoom(CLUSTER_MAX_ZOOM)
@@ -98,7 +108,7 @@ object StationLayers {
             CircleLayer(CLUSTER_LAYER_ID, SOURCE_ID)
                 .withFilter(has("point_count"))
                 .withProperties(
-                    circleColor(colors.fill),
+                    circleColor(colors.clusterFill),
                     // Bigger circles for bigger groups.
                     circleRadius(
                         step(get("point_count"), literal(14f), stop(50, 17f), stop(250, 21f), stop(1000, 26f)),
@@ -114,19 +124,26 @@ object StationLayers {
                     textField(get("point_count_abbreviated")),
                     textFont(arrayOf(font)),
                     textSize(12f),
-                    textColor(colors.text),
+                    textColor(colors.clusterText),
                     textAllowOverlap(true),
                     textIgnorePlacement(true),
                 ),
         )
+        // Single stations: one icon per price class (colour + shape, see StationIcons).
+        PriceClass.entries.forEach { style.addImage(StationIcons.imageName(it), StationIcons.draw(it, density)) }
         style.addLayer(
-            CircleLayer(STATION_LAYER_ID, SOURCE_ID)
+            SymbolLayer(STATION_LAYER_ID, SOURCE_ID)
                 .withFilter(not(has("point_count")))
                 .withProperties(
-                    circleColor(colors.fill),
-                    circleRadius(6f),
-                    circleStrokeColor(colors.stroke),
-                    circleStrokeWidth(1.5f),
+                    iconImage(
+                        match(
+                            get(CLASS_PROPERTY),
+                            literal(StationIcons.imageName(PriceClass.NOT_COMPARED)),
+                            *PriceClass.entries.map { stop(it.name, StationIcons.imageName(it)) }.toTypedArray(),
+                        ),
+                    ),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true),
                 ),
         )
         // Ring around the selected station (none selected: matches nothing).
@@ -134,7 +151,7 @@ object StationLayers {
             CircleLayer(SELECTED_LAYER_ID, SOURCE_ID)
                 .withFilter(selectedFilter(NO_STATION))
                 .withProperties(
-                    circleRadius(11f),
+                    circleRadius(13f),
                     circleOpacity(0f),
                     circleStrokeColor(colors.selected),
                     circleStrokeWidth(3f),

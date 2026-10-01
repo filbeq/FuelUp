@@ -1,11 +1,13 @@
 package io.github.filbeq.fuelup.ui.map
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -15,14 +17,19 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
+import io.github.filbeq.fuelup.data.PriceClass
 import io.github.filbeq.fuelup.data.ServiceMode
+import io.github.filbeq.fuelup.map.StationIcons
 
 /**
  * Fuel chips (Benzina · Gasolio · GPL · Metano · GNL) and, for petrol and
@@ -49,6 +56,7 @@ fun FuelSelector(choice: FuelChoice, onChoiceChange: (FuelChoice) -> Unit, modif
                     )
                 }
             }
+            PriceLegend(Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
             if (choice.modeApplies) {
                 SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 12.dp)) {
                     val modes = ServiceMode.entries
@@ -75,4 +83,28 @@ fun fuelLabel(kind: FuelKind): Int = when (kind) {
     FuelKind.CNG -> R.string.fuel_cng
     FuelKind.LNG -> R.string.fuel_lng
     FuelKind.OTHER -> R.string.fuel_other
+}
+
+/** What the marker shapes and colours mean (the same icons as on the map). */
+@Composable
+private fun PriceLegend(modifier: Modifier = Modifier) {
+    val density = LocalDensity.current.density
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(
+            PriceClass.CHEAP to R.string.legend_cheap,
+            PriceClass.AVERAGE to R.string.legend_average,
+            PriceClass.EXPENSIVE to R.string.legend_expensive,
+            PriceClass.TO_VERIFY to R.string.legend_to_verify,
+        ).forEach { (priceClass, label) ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                val icon = remember(priceClass, density) { StationIcons.draw(priceClass, density).asImageBitmap() }
+                Image(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
 }

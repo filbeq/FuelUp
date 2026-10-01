@@ -19,7 +19,7 @@ class StationGeoJsonTest {
         val petrolSelf = FuelChoice.Default
         val indices = file.standardFuelIndices(petrolSelf.fuel)
         val geoJson = Json.parseToJsonElement(
-            StationLayers.buildGeoJson(stations) { it.priceFor(petrolSelf, indices) },
+            StationLayers.buildGeoJson(stations, PriceRanking.rank(stations, petrolSelf, indices)),
         ).jsonObject
 
         assertEquals("FeatureCollection", geoJson["type"]!!.jsonPrimitive.content)
@@ -33,12 +33,14 @@ class StationGeoJsonTest {
         val properties = first["properties"] as JsonObject
         assertEquals("3464", properties["id"]!!.jsonPrimitive.content)
         assertEquals("2049", properties["p"]!!.jsonPrimitive.content) // Benzina self
+        // Only two petrol stations in the fixture: too few neighbours to compare.
+        assertEquals("NOT_COMPARED", properties["c"]!!.jsonPrimitive.content)
         // GeoJSON order is [longitude, latitude].
         assertEquals(listOf("11.57083", "44.88012"), geometry["coordinates"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test
     fun emptyList() {
-        assertEquals("""{"type":"FeatureCollection","features":[]}""", StationLayers.buildGeoJson(emptyList<Station>()) { null })
+        assertEquals("""{"type":"FeatureCollection","features":[]}""", StationLayers.buildGeoJson(emptyList<Station>(), emptyMap()))
     }
 }

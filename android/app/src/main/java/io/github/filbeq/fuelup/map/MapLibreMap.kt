@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -60,6 +61,7 @@ fun MapLibreMap(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current.density
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     val currentColors = rememberUpdatedState(stationColors)
     val currentOnStationClick = rememberUpdatedState(onStationClick)
@@ -102,7 +104,7 @@ fun MapLibreMap(
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                 LabelLanguage.apply(style, labelLanguage)
                 // A new style starts empty: add our source and layers every time.
-                StationLayers.addTo(style, currentColors.value, labelFont)
+                StationLayers.addTo(style, currentColors.value, labelFont, density)
                 loadedStyle = style
             }
         }
