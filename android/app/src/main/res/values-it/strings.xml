@@ -2,4 +2,5 @@
 <!-- Italian. Every translatable string in values/strings.xml must be here too
      (lint's MissingTranslation check fails the build otherwise). -->
 <resources>
+    <string name="attribution_osm">© contributori di OpenStreetMap</string>
 </resources>
