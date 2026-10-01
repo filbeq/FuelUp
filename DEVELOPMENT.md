@@ -130,8 +130,8 @@ language instead.
 | Path (under `android/app/src/main/`) | What it does |
 |---|---|
 | `java/…/MainActivity.kt` | Entry point: initialises MapLibre, sets the theme |
-| `java/…/ui/FuelUpApp.kt` | Switches between the map and About; keeps the camera |
-| `java/…/ui/map/MapScreen.kt` | Top bar, map, always-visible map credits |
+| `java/…/ui/FuelUpApp.kt` | Switches between the map and About; keeps the camera and the selected station (no navigation library, see CLAUDE.md) |
+| `java/…/ui/map/MapScreen.kt` | Top bar, map, station sheet (non-modal), credits that follow the sheet |
 | `java/…/map/MapLibreMap.kt` | MapLibre `MapView` inside Compose (all MapLibre glue) |
 | `java/…/map/MapProvider.kt` | Map style URLs and credits: change `CurrentMapProvider` to switch provider |
 | `java/…/ui/map/MapViewModel.kt` | Loads the cache, then refreshes in the background |
@@ -140,8 +140,11 @@ language instead.
 | `java/…/data/StationRepository.kt` | Download, validation, file cache |
 | `java/…/data/RefreshPolicy.kt` | When to contact the server |
 | `java/…/data/DataSource.kt` | Where the data is published (one URL) |
-| `java/…/map/StationLayers.kt` | Stations as clustered markers (GeoJSON source + layers) |
+| `java/…/map/StationLayers.kt` | Stations as clustered markers, selection ring, tap handling (cluster → zoom in, station → select) |
 | `java/…/map/LabelLanguage.kt` | Map place names in the app language |
+| `java/…/ui/station/StationDetails.kt` | Station + prices per fuel, from the cached data (pure Kotlin) |
+| `java/…/ui/station/PriceFormat.kt` | Price numbers and "days since reported" |
+| `java/…/ui/station/StationSheet.kt` | Station sheet content and the Navigate (`geo:`) intent |
 | `java/…/ui/about/AboutScreen.kt` | Data source, notices, map credits |
 | `java/…/ui/theme/` | Fixed FuelUp light/dark palette |
 | `res/values/strings.xml`, `res/values-it/strings.xml` | English and Italian text |

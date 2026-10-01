@@ -32,8 +32,13 @@ small enough to be tested on a real phone before moving on.
   - prices: `https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv`
   - stations: `https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv`
   - dataset page: https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti
-  - metadata PDF: `Metadati_prezzi_carburanti_20260128.pdf` (dated 28 Jan 2026),
-    linked from the dataset page
+  - metadata PDF: `Metadati_prezzi_carburanti_20260128.pdf`, linked from the
+    dataset page: file dated 28 Jan 2026, format **in force since 10 Feb 2026**
+    (as the dataset page states)
+- Reporting rule (MIMIT, legal basis art. 51 L. 99/2009): operators report
+  prices **weekly, and whenever a price rises or falls**. A price not
+  re-reported for days is usually just unchanged: show its age neutrally,
+  never as a warning. The pipeline's 8-day cut-off = one week + margin.
 - Prices are those in force at **08:00 (Italian time) on the date in the
   `Estrazione del YYYY-MM-DD` header line**; the files are published the next
   morning. Always take the data date from the file, never from "today". It is
@@ -110,6 +115,14 @@ small enough to be tested on a real phone before moving on.
   Compose compiler plugin matching the Kotlin version, version catalog in
   `gradle/libs.versions.toml`. minSdk 26, targetSdk 36, compileSdk 37 (required
   by current AndroidX). Open/build the `android/` folder, not the repo root.
+- Navigation: no navigation library yet. Two places (map, About) plus a
+  station sheet that is part of the map screen, driven by saved state in
+  `FuelUpApp` and system Back. Revisit when real screens are added (step 8:
+  favorites, search, settings), deep links, or a deeper back stack.
+- Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
+  collapsed = name + main prices, expanded = details. Back: expanded →
+  collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
+  no Google dependency).
 - Theme: fixed FuelUp light/dark palette (follows the system dark setting);
   no dynamic colour.
 - Maps: MapLibre Native for Android (`org.maplibre.gl:android-sdk`) wrapped in
