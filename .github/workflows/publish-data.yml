@@ -35,6 +35,11 @@ jobs:
       - name: Run tests
         run: python -m unittest -v
 
+      # Same contract check as CI: the published format must be the one the
+      # app's tests were written against.
+      - name: Check the Android test fixture matches the pipeline output
+        run: python scripts/make_android_fixture.py --check
+
       - name: Download MIMIT data and build JSON
         run: python -m fuel_pipeline --out out
 
