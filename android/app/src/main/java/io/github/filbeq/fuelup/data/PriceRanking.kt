@@ -1,5 +1,6 @@
 package io.github.filbeq.fuelup.data
 
+import java.util.stream.IntStream
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
@@ -67,6 +68,9 @@ object PriceRanking {
         FuelKind.OTHER to Thresholds(bandMilli = 20, outlierMilli = 500),
     )
 
+    /** Stations per parallel work unit. */
+    private const val CHUNK = 256
+
     /** Municipalities outside the EU customs area (MIMIT spelling). */
     val DUTY_FREE_MUNICIPALITIES = setOf("LIVIGNO")
 
@@ -85,19 +89,27 @@ object PriceRanking {
             val rule = GROUP_RULES.getValue(group)
             val points = members.map { (station, price) -> Point(station.lat, station.lon, price.priceMilli) }
             val index = GridIndex(points)
-            members.forEachIndexed { i, (station, price) ->
-                val neighbourPrices = index.nearestPrices(i, rule.neighbours, rule.maxDistanceKm)
-                val diff = if (neighbourPrices.size < rule.minNeighbours) {
-                    null
-                } else {
-                    price.priceMilli - median(neighbourPrices)
+            // Each station is compared independently: spread the work over the CPU
+            // cores, each worker with its own scratch buffers (a Searcher).
+            val diffs = arrayOfNulls<Double>(members.size)
+            IntStream.range(0, (members.size + CHUNK - 1) / CHUNK).parallel().forEach { chunk ->
+                val searcher = index.Searcher()
+                for (i in chunk * CHUNK until minOf(members.size, (chunk + 1) * CHUNK)) {
+                    val neighbourPrices = searcher.nearestPrices(i, rule.neighbours, rule.maxDistanceKm)
+                    diffs[i] = if (neighbourPrices.size < rule.minNeighbours) {
+                        null
+                    } else {
+                        points[i].priceMilli - median(neighbourPrices)
+                    }
                 }
+            }
+            members.forEachIndexed { i, (station, price) ->
                 result[station.id] = RankedPrice(
                     priceMilli = price.priceMilli,
                     updatedEpochSeconds = price.updatedEpochSeconds,
                     group = group,
-                    priceClass = classify(diff, thresholds),
-                    diffFromMedianMilli = diff,
+                    priceClass = classify(diffs[i], thresholds),
+                    diffFromMedianMilli = diffs[i],
                 )
             }
         }
@@ -135,8 +147,6 @@ object PriceRanking {
         private val rows = (points.maxOfOrNull { rowOf(it.lat) } ?: 0) - minRow + 1
         private val cols = (points.maxOfOrNull { colOf(it.lon) } ?: 0) - minCol + 1
         private val cells = arrayOfNulls<IntArray>(rows * cols)
-        private var dist2 = DoubleArray(64) // squared distances, km²
-        private var idx = IntArray(64)
 
         init {
             val counts = IntArray(rows * cols)
@@ -151,94 +161,100 @@ object PriceRanking {
 
         private fun cellOf(p: Point) = (rowOf(p.lat) - minRow) * cols + (colOf(p.lon) - minCol)
 
-        /** Prices of the (up to) [count] nearest other stations within [maxKm], in no particular order. */
-        fun nearestPrices(i: Int, count: Int, maxKm: Double): LongArray {
-            val p = points[i]
-            val row = rowOf(p.lat) - minRow
-            val col = colOf(p.lon) - minCol
-            // Locally, one degree of longitude is cos(latitude) times shorter than one of latitude.
-            val kmPerDegLon = KM_PER_DEG_LAT * cos(p.lat * PI / 180)
-            val maxKm2 = maxKm * maxKm
-            // After visiting rings 0..r, every station within r cells' width is known
-            // (east-west is the narrower side of a cell).
-            val cellKm = CELL_DEG * kmPerDegLon
-            var n = 0
-            var ring = 0
-            while (true) {
-                if (ring == 0) {
-                    n = visit(i, row, col, kmPerDegLon, maxKm2, n)
-                } else {
-                    for (c in col - ring..col + ring) {
-                        n = visit(i, row - ring, c, kmPerDegLon, maxKm2, n)
-                        n = visit(i, row + ring, c, kmPerDegLon, maxKm2, n)
-                    }
-                    for (r in row - ring + 1 until row + ring) {
-                        n = visit(i, r, col - ring, kmPerDegLon, maxKm2, n)
-                        n = visit(i, r, col + ring, kmPerDegLon, maxKm2, n)
-                    }
-                }
-                val covered = ring * cellKm
-                if (covered >= maxKm) break
-                val covered2 = covered * covered
-                var closeEnough = 0
-                for (k in 0 until n) if (dist2[k] <= covered2) closeEnough++
-                if (closeEnough >= count) break
-                ring++
-            }
-            val k = minOf(count, n)
-            selectSmallest(k, n)
-            return LongArray(k) { points[idx[it]].priceMilli }
-        }
+        /** Does the searches; one per thread (it reuses its buffers between searches). */
+        inner class Searcher {
+            private var dist2 = DoubleArray(64) // squared distances, km²
+            private var idx = IntArray(64)
 
-        /** Adds the stations of cell (r, c) within range of station [i]; returns the new count. */
-        private fun visit(i: Int, r: Int, c: Int, kmPerDegLon: Double, maxKm2: Double, count: Int): Int {
-            if (r < 0 || r >= rows || c < 0 || c >= cols) return count
-            val members = cells[r * cols + c] ?: return count
-            var n = count
-            val p = points[i]
-            for (j in members) {
-                if (j == i) continue
-                val q = points[j]
-                val x = (q.lon - p.lon) * kmPerDegLon
-                val y = (q.lat - p.lat) * KM_PER_DEG_LAT
-                val d2 = x * x + y * y
-                if (d2 > maxKm2) continue
-                if (n == dist2.size) {
-                    dist2 = dist2.copyOf(n * 2)
-                    idx = idx.copyOf(n * 2)
-                }
-                dist2[n] = d2
-                idx[n] = j
-                n++
-            }
-            return n
-        }
-
-        /** Moves the [k] smallest of the first [n] distances to the front (quickselect). */
-        private fun selectSmallest(k: Int, n: Int) {
-            if (k <= 0 || k >= n) return
-            var lo = 0
-            var hi = n - 1
-            while (lo < hi) {
-                val pivot = dist2[(lo + hi) ushr 1]
-                var a = lo
-                var b = hi
-                while (a <= b) {
-                    while (dist2[a] < pivot) a++
-                    while (dist2[b] > pivot) b--
-                    if (a <= b) {
-                        swap(a, b)
-                        a++
-                        b--
+            /** Prices of the (up to) [count] nearest other stations within [maxKm], in no particular order. */
+            fun nearestPrices(i: Int, count: Int, maxKm: Double): LongArray {
+                val p = points[i]
+                val row = rowOf(p.lat) - minRow
+                val col = colOf(p.lon) - minCol
+                // Locally, one degree of longitude is cos(latitude) times shorter than one of latitude.
+                val kmPerDegLon = KM_PER_DEG_LAT * cos(p.lat * PI / 180)
+                val maxKm2 = maxKm * maxKm
+                // After visiting rings 0..r, every station within r cells' width is known
+                // (east-west is the narrower side of a cell).
+                val cellKm = CELL_DEG * kmPerDegLon
+                var n = 0
+                var ring = 0
+                while (true) {
+                    if (ring == 0) {
+                        n = visit(i, row, col, kmPerDegLon, maxKm2, n)
+                    } else {
+                        for (c in col - ring..col + ring) {
+                            n = visit(i, row - ring, c, kmPerDegLon, maxKm2, n)
+                            n = visit(i, row + ring, c, kmPerDegLon, maxKm2, n)
+                        }
+                        for (r in row - ring + 1 until row + ring) {
+                            n = visit(i, r, col - ring, kmPerDegLon, maxKm2, n)
+                            n = visit(i, r, col + ring, kmPerDegLon, maxKm2, n)
+                        }
                     }
+                    val covered = ring * cellKm
+                    if (covered >= maxKm) break
+                    val covered2 = covered * covered
+                    var closeEnough = 0
+                    for (k in 0 until n) if (dist2[k] <= covered2) closeEnough++
+                    if (closeEnough >= count) break
+                    ring++
                 }
-                if (k - 1 <= b) hi = b else if (k - 1 >= a) lo = a else return
+                val k = minOf(count, n)
+                selectSmallest(k, n)
+                return LongArray(k) { points[idx[it]].priceMilli }
             }
-        }
 
-        private fun swap(a: Int, b: Int) {
-            val d = dist2[a]; dist2[a] = dist2[b]; dist2[b] = d
-            val j = idx[a]; idx[a] = idx[b]; idx[b] = j
+            /** Adds the stations of cell (r, c) within range of station [i]; returns the new count. */
+            private fun visit(i: Int, r: Int, c: Int, kmPerDegLon: Double, maxKm2: Double, count: Int): Int {
+                if (r < 0 || r >= rows || c < 0 || c >= cols) return count
+                val members = cells[r * cols + c] ?: return count
+                var n = count
+                val p = points[i]
+                for (j in members) {
+                    if (j == i) continue
+                    val q = points[j]
+                    val x = (q.lon - p.lon) * kmPerDegLon
+                    val y = (q.lat - p.lat) * KM_PER_DEG_LAT
+                    val d2 = x * x + y * y
+                    if (d2 > maxKm2) continue
+                    if (n == dist2.size) {
+                        dist2 = dist2.copyOf(n * 2)
+                        idx = idx.copyOf(n * 2)
+                    }
+                    dist2[n] = d2
+                    idx[n] = j
+                    n++
+                }
+                return n
+            }
+
+            /** Moves the [k] smallest of the first [n] distances to the front (quickselect). */
+            private fun selectSmallest(k: Int, n: Int) {
+                if (k <= 0 || k >= n) return
+                var lo = 0
+                var hi = n - 1
+                while (lo < hi) {
+                    val pivot = dist2[(lo + hi) ushr 1]
+                    var a = lo
+                    var b = hi
+                    while (a <= b) {
+                        while (dist2[a] < pivot) a++
+                        while (dist2[b] > pivot) b--
+                        if (a <= b) {
+                            swap(a, b)
+                            a++
+                            b--
+                        }
+                    }
+                    if (k - 1 <= b) hi = b else if (k - 1 >= a) lo = a else return
+                }
+            }
+
+            private fun swap(a: Int, b: Int) {
+                val d = dist2[a]; dist2[a] = dist2[b]; dist2[b] = d
+                val j = idx[a]; idx[a] = idx[b]; idx[b] = j
+            }
         }
 
         private companion object {
