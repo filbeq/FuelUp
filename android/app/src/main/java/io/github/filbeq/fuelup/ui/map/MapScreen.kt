@@ -35,6 +35,8 @@ fun MapScreen(
     onRetry: () -> Unit,
     camera: MapCamera,
     onCameraChange: (MapCamera) -> Unit,
+    selectedStationId: Int?,
+    onStationClick: (Int) -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     val provider = CurrentMapProvider
@@ -64,9 +66,12 @@ fun MapScreen(
                     fill = MaterialTheme.colorScheme.primary.toArgb(),
                     text = MaterialTheme.colorScheme.onPrimary.toArgb(),
                     stroke = MaterialTheme.colorScheme.surface.toArgb(),
+                    selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                 ),
                 labelFont = provider.labelFont,
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
+                selectedStationId = selectedStationId,
+                onStationClick = onStationClick,
                 modifier = Modifier.fillMaxSize(),
             )
             DataStatusCard(

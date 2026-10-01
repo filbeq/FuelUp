@@ -53,11 +53,16 @@ fun MapLibreMap(
     labelFont: String,
     /** Language for place names on the map, see [LabelLanguage]. */
     labelLanguage: String,
+    /** Station drawn as selected (highlight ring), or null. */
+    selectedStationId: Int?,
+    /** Called with the id of a tapped station. Taps on clusters zoom in. */
+    onStationClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     val currentColors = rememberUpdatedState(stationColors)
+    val currentOnStationClick = rememberUpdatedState(onStationClick)
     // The style currently on screen, once fully loaded (null while loading).
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember {
@@ -74,6 +79,13 @@ fun MapLibreMap(
         MapView(context, options).apply {
             onCreate(null)
             getMapAsync { map ->
+                map.addOnMapClickListener { latLng ->
+                    val style = map.style?.takeIf { it.isFullyLoaded } ?: return@addOnMapClickListener false
+                    val point = map.projection.toScreenLocation(latLng)
+                    StationLayers.handleTap(map, style, point, resources.displayMetrics.density) {
+                        currentOnStationClick.value(it)
+                    }
+                }
                 map.addOnCameraIdleListener {
                     val position = map.cameraPosition
                     val target = position.target ?: return@addOnCameraIdleListener
@@ -98,6 +110,10 @@ fun MapLibreMap(
 
     LaunchedEffect(loadedStyle, stationsGeoJson) {
         loadedStyle?.let { StationLayers.setData(it, stationsGeoJson) }
+    }
+
+    LaunchedEffect(loadedStyle, selectedStationId) {
+        loadedStyle?.let { StationLayers.setSelected(it, selectedStationId) }
     }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle

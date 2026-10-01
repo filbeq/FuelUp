@@ -24,6 +24,7 @@ class StationGeoJsonTest {
         assertEquals("3464", first["id"]!!.jsonPrimitive.content)
         val geometry = first["geometry"] as JsonObject
         assertEquals("Point", geometry["type"]!!.jsonPrimitive.content)
+        assertEquals("3464", (first["properties"] as JsonObject)["id"]!!.jsonPrimitive.content)
         // GeoJSON order is [longitude, latitude].
         assertEquals(listOf("11.57083", "44.88012"), geometry["coordinates"]!!.jsonArray.map { it.jsonPrimitive.content })
     }

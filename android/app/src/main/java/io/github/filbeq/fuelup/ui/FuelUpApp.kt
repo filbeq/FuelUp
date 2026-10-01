@@ -25,6 +25,8 @@ fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
     val mapState by mapViewModel.state.collectAsStateWithLifecycle()
     var showAbout by rememberSaveable { mutableStateOf(false) }
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
+    // The station whose details are shown (survives rotation).
+    var selectedStationId by rememberSaveable { mutableStateOf<Int?>(null) }
 
     if (showAbout) {
         BackHandler { showAbout = false }
@@ -35,6 +37,8 @@ fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
             onRetry = mapViewModel::retry,
             camera = camera,
             onCameraChange = { camera = it },
+            selectedStationId = selectedStationId,
+            onStationClick = { selectedStationId = it },
             onOpenAbout = { showAbout = true },
         )
     }
