@@ -51,6 +51,8 @@ fun MapLibreMap(
     stationsGeoJson: String?,
     stationColors: StationColors,
     labelFont: String,
+    /** Language for place names on the map, see [LabelLanguage]. */
+    labelLanguage: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -81,10 +83,12 @@ fun MapLibreMap(
         }
     }
 
+    // Changing the app language recreates the screen, so the language is fixed here.
     LaunchedEffect(mapView, styleUrl) {
         loadedStyle = null
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
+                LabelLanguage.apply(style, labelLanguage)
                 // A new style starts empty: add our source and layers every time.
                 StationLayers.addTo(style, currentColors.value, labelFont)
                 loadedStyle = style
