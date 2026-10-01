@@ -72,4 +72,6 @@
     <string name="legend_average">Average</string>
     <string name="legend_expensive">Expensive</string>
     <string name="legend_to_verify">To verify</string>
+    <!-- Cluster label: cheapest price in the group; %1$s = price like "1.990" -->
+    <string name="cluster_from_price">from %1$s</string>
 </resources>

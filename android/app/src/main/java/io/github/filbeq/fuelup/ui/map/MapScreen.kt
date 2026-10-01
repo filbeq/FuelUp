@@ -52,6 +52,7 @@ import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.LabelLanguage
 import io.github.filbeq.fuelup.map.MapCamera
+import io.github.filbeq.fuelup.map.MapLabels
 import io.github.filbeq.fuelup.map.MapLibreMap
 import io.github.filbeq.fuelup.map.StationColors
 import io.github.filbeq.fuelup.ui.station.StationDetails
@@ -177,8 +178,11 @@ fun MapScreen(
                     clusterText = MaterialTheme.colorScheme.onSecondaryContainer.toArgb(),
                     stroke = MaterialTheme.colorScheme.surface.toArgb(),
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
+                    labelText = MaterialTheme.colorScheme.onSurface.toArgb(),
+                    labelHalo = MaterialTheme.colorScheme.surface.toArgb(),
                 ),
                 labelFont = provider.labelFont,
+                mapLabels = mapLabels(),
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
                 selectedStationId = selectedStationId,
                 onStationClick = onStationClick,
@@ -219,4 +223,13 @@ private fun MapAttributionBar(onClick: () -> Unit, modifier: Modifier = Modifier
                 .padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
+}
+
+/** Map label texts in the app language (see [MapLabels]). */
+@Composable
+private fun mapLabels(): MapLabels {
+    val locale = LocalConfiguration.current.locales[0]
+    val template = stringResource(R.string.cluster_from_price)
+    val (prefix, suffix) = template.split("%1\$s", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+    return MapLabels(localeTag = locale.toLanguageTag(), clusterPricePrefix = prefix, clusterPriceSuffix = suffix)
 }

@@ -10,16 +10,28 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.expressions.Expression.NumberFormatOption.locale
+import org.maplibre.android.style.expressions.Expression.NumberFormatOption.maxFractionDigits
+import org.maplibre.android.style.expressions.Expression.NumberFormatOption.minFractionDigits
+import org.maplibre.android.style.expressions.Expression.accumulated
 import org.maplibre.android.style.expressions.Expression.all
+import org.maplibre.android.style.expressions.Expression.concat
+import org.maplibre.android.style.expressions.Expression.division
 import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.has
 import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.lt
 import org.maplibre.android.style.expressions.Expression.match
+import org.maplibre.android.style.expressions.Expression.min
 import org.maplibre.android.style.expressions.Expression.not
+import org.maplibre.android.style.expressions.Expression.numberFormat
 import org.maplibre.android.style.expressions.Expression.step
 import org.maplibre.android.style.expressions.Expression.stop
+import org.maplibre.android.style.expressions.Expression.switchCase
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
@@ -29,6 +41,10 @@ import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.textAnchor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
+import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textColor
 import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.layers.PropertyFactory.textFont
@@ -42,10 +58,24 @@ import org.maplibre.geojson.Point
 import kotlin.math.hypot
 
 /**
+ * Texts for map labels in the app language: [localeTag] for number formatting
+ * ("1,990" vs "1.990"), and the text around a cluster's cheapest price, from a
+ * string like "da %1$s" → prefix "da ", suffix "".
+ */
+data class MapLabels(val localeTag: String, val clusterPricePrefix: String, val clusterPriceSuffix: String)
+
+/**
  * Colours (ARGB) from the app theme. Clusters are neutral on purpose: the brand
  * green would read as "cheap". Station markers use [StationIcons].
  */
-data class StationColors(val clusterFill: Int, val clusterText: Int, val stroke: Int, val selected: Int)
+data class StationColors(
+    val clusterFill: Int,
+    val clusterText: Int,
+    val stroke: Int,
+    val selected: Int,
+    val labelText: Int,
+    val labelHalo: Int,
+)
 
 /**
  * Stations on the map, grouped by MapLibre's built-in GeoJSON clustering:
@@ -55,10 +85,16 @@ object StationLayers {
     private const val SOURCE_ID = "fuelup-stations"
     private const val CLUSTER_LAYER_ID = "fuelup-clusters"
     private const val COUNT_LAYER_ID = "fuelup-cluster-count"
+    private const val PRICE_LAYER_ID = "fuelup-station-price"
     private const val STATION_LAYER_ID = "fuelup-station"
     private const val SELECTED_LAYER_ID = "fuelup-selected"
     private const val ID_PROPERTY = "id"
     private const val CLASS_PROPERTY = "c"
+    private const val PRICE_PROPERTY = "p"
+    /** Cluster property: cheapest price in the group, ignoring prices "to verify". */
+    private const val MIN_PRICE_PROPERTY = "minPrice"
+    /** Stands in for "no usable price" (all stations in the cluster to verify). */
+    private const val NO_PRICE = 1_000_000
     private const val NO_STATION = -1
 
     /** Taps this close to a marker count as a tap on it (markers are only 6 dp). */
@@ -97,11 +133,21 @@ object StationLayers {
         }
 
     /** Adds the source and layers to a freshly loaded style (initially empty). */
-    fun addTo(style: Style, colors: StationColors, font: String, density: Float) {
+    fun addTo(style: Style, colors: StationColors, font: String, density: Float, labels: MapLabels) {
         val options = GeoJsonOptions()
             .withCluster(true)
             .withClusterMaxZoom(CLUSTER_MAX_ZOOM)
             .withClusterRadius(CLUSTER_RADIUS)
+            // Each cluster carries its cheapest price; flagged prices don't count.
+            .withClusterProperty(
+                MIN_PRICE_PROPERTY,
+                min(accumulated(), get(MIN_PRICE_PROPERTY)),
+                switchCase(
+                    eq(get(CLASS_PROPERTY), literal(PriceClass.TO_VERIFY.name)),
+                    literal(NO_PRICE),
+                    get(PRICE_PROPERTY),
+                ),
+            )
         style.addSource(GeoJsonSource(SOURCE_ID, EMPTY, options))
 
         style.addLayer(
@@ -109,9 +155,9 @@ object StationLayers {
                 .withFilter(has("point_count"))
                 .withProperties(
                     circleColor(colors.clusterFill),
-                    // Bigger circles for bigger groups.
+                    // Bigger circles for bigger groups; big enough for "da 1,990".
                     circleRadius(
-                        step(get("point_count"), literal(14f), stop(50, 17f), stop(250, 21f), stop(1000, 26f)),
+                        step(get("point_count"), literal(22f), stop(50, 24f), stop(250, 27f), stop(1000, 30f)),
                     ),
                     circleStrokeColor(colors.stroke),
                     circleStrokeWidth(1.5f),
@@ -121,9 +167,20 @@ object StationLayers {
             SymbolLayer(COUNT_LAYER_ID, SOURCE_ID)
                 .withFilter(has("point_count"))
                 .withProperties(
-                    textField(get("point_count_abbreviated")),
+                    // "da 1,990"; the station count if every price in it is to verify.
+                    textField(
+                        switchCase(
+                            lt(get(MIN_PRICE_PROPERTY), literal(NO_PRICE)),
+                            concat(
+                                literal(labels.clusterPricePrefix),
+                                priceText(get(MIN_PRICE_PROPERTY), labels.localeTag),
+                                literal(labels.clusterPriceSuffix),
+                            ),
+                            get("point_count_abbreviated"),
+                        ),
+                    ),
                     textFont(arrayOf(font)),
-                    textSize(12f),
+                    textSize(11f),
                     textColor(colors.clusterText),
                     textAllowOverlap(true),
                     textIgnorePlacement(true),
@@ -146,6 +203,22 @@ object StationLayers {
                     iconIgnorePlacement(true),
                 ),
         )
+        // Price under each single station ("1,990"). Labels that would collide are
+        // dropped by MapLibre; the markers above always stay.
+        style.addLayer(
+            SymbolLayer(PRICE_LAYER_ID, SOURCE_ID)
+                .withFilter(not(has("point_count")))
+                .withProperties(
+                    textField(priceText(get(PRICE_PROPERTY), labels.localeTag)),
+                    textFont(arrayOf(font)),
+                    textSize(12f),
+                    textAnchor(Property.TEXT_ANCHOR_TOP),
+                    textOffset(arrayOf(0f, 0.9f)),
+                    textColor(colors.labelText),
+                    textHaloColor(colors.labelHalo),
+                    textHaloWidth(1.5f),
+                ),
+        )
         // Ring around the selected station (none selected: matches nothing).
         style.addLayer(
             CircleLayer(SELECTED_LAYER_ID, SOURCE_ID)
@@ -158,6 +231,14 @@ object StationLayers {
                 ),
         )
     }
+
+    /** A price in thousandths of a euro as "1,990" / "1.990" for [localeTag]. */
+    private fun priceText(milli: Expression, localeTag: String) = numberFormat(
+        division(milli, literal(1000)),
+        locale(localeTag),
+        minFractionDigits(3),
+        maxFractionDigits(3),
+    )
 
     /** Highlights station [id] (null = none). */
     fun setSelected(style: Style, id: Int?) {

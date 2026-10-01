@@ -52,6 +52,7 @@ fun MapLibreMap(
     stationsGeoJson: String?,
     stationColors: StationColors,
     labelFont: String,
+    mapLabels: MapLabels,
     /** Language for place names on the map, see [LabelLanguage]. */
     labelLanguage: String,
     /** Station drawn as selected (highlight ring), or null. */
@@ -104,7 +105,7 @@ fun MapLibreMap(
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                 LabelLanguage.apply(style, labelLanguage)
                 // A new style starts empty: add our source and layers every time.
-                StationLayers.addTo(style, currentColors.value, labelFont, density)
+                StationLayers.addTo(style, currentColors.value, labelFont, density, mapLabels)
                 loadedStyle = style
             }
         }

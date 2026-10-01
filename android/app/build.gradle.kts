@@ -38,6 +38,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    lint {
+        // Debug builds are arm64-only on purpose (see buildTypes.debug); release
+        // bundles keep every ABI, including x86_64 for ChromeOS.
+        disable += "ChromeOsAbiSupport"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true // the About screen shows BuildConfig.VERSION_NAME
