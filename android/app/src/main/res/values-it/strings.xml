@@ -3,4 +3,24 @@
      (lint's MissingTranslation check fails the build otherwise). -->
 <resources>
     <string name="attribution_osm">© contributori di OpenStreetMap</string>
+
+    <!-- Azioni -->
+    <string name="action_about">Informazioni</string>
+    <string name="action_back">Indietro</string>
+    <string name="action_show_credits">Mostra i crediti</string>
+
+    <!-- Schermata Informazioni -->
+    <string name="about_title">Informazioni</string>
+    <string name="about_version">Versione %1$s</string>
+    <string name="about_unofficial_title">App non ufficiale</string>
+    <string name="about_unofficial_body">FuelUp è un progetto indipendente. Non è un\'app ufficiale e non è affiliata né approvata dal Ministero delle Imprese e del Made in Italy (MIMIT).</string>
+    <string name="about_prices_title">Informazioni sui prezzi</string>
+    <string name="about_prices_body">I prezzi sono quelli in vigore alle 8:00 della data indicata nell\'app, come comunicati dai gestori al Ministero. Non sono in tempo reale: verifica sempre il prezzo alla pompa.</string>
+    <string name="about_data_title">Dati sui prezzi</string>
+    <string name="about_data_source">Fonte dati: Ministero delle Imprese e del Made in Italy — Osservaprezzi Carburanti</string>
+    <string name="about_data_license">Dati rilasciati con licenza Italian Open Data License 2.0 (IODL 2.0).</string>
+    <string name="about_open_dataset">Apri la pagina del dataset</string>
+    <string name="about_open_license">Apri la licenza</string>
+    <string name="about_map_title">Mappa</string>
+    <string name="about_map_body">Dati e tasselli della mappa:</string>
 </resources>
