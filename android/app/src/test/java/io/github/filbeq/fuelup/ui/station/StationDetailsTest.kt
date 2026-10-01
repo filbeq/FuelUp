@@ -1,7 +1,9 @@
 package io.github.filbeq.fuelup.ui.station
 
 import io.github.filbeq.fuelup.data.Fuel
+import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
+import io.github.filbeq.fuelup.data.ServiceMode
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationDataJson
@@ -12,6 +14,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.util.Locale
 
 class StationDetailsTest {
     private fun fixture(name: String) = checkNotNull(javaClass.getResourceAsStream("/fixtures/$name"))
@@ -42,8 +45,9 @@ class StationDetailsTest {
         assertNull(methane.self) // served only
         assertEquals(1794L, methane.served!!.priceMilli)
 
-        assertEquals(listOf("Benzina", "Gasolio"), details.mainRows.map { it.name })
-        assertEquals(2049L, details.mainRows[0].preferred!!.priceMilli) // self preferred
+        assertEquals(2049L, details.rows[0].preferred!!.priceMilli) // self preferred
+        assertTrue(details.rows[0].isChosen(FuelChoice(FuelKind.PETROL, ServiceMode.SELF)))
+        assertFalse(details.rows[1].isChosen(FuelChoice(FuelKind.PETROL, ServiceMode.SELF)))
     }
 
     @Test
@@ -57,10 +61,18 @@ class StationDetailsTest {
     }
 
     @Test
-    fun mainPricesFallBackToFirstStandardFuel() {
-        // Station 40820 only has LPG left after the pipeline's cleaning.
-        val details = snapshot.stationDetails(40820)!!
-        assertEquals(listOf("GPL"), details.mainRows.map { it.name })
+    fun specialProductIsNeverTheChosenRow() {
+        val details = snapshot.stationDetails(54386)!!
+        val ethanol = details.rows.single { it.name == "Etanolo E85" }
+        FuelChoice.SELECTABLE.forEach { assertFalse(ethanol.isChosen(FuelChoice(it, ServiceMode.SELF))) }
+    }
+
+    @Test
+    fun centsFormatting() {
+        assertEquals("3,5", formatCents(-35.0, Locale.ITALIAN))
+        assertEquals("3.5", formatCents(35.0, Locale.ENGLISH))
+        assertEquals("20", formatCents(-200.0, Locale.ITALIAN))
+        assertEquals("2,5", formatCents(-25.0, Locale.ITALIAN)) // median of an even count can be x.5 milli
     }
 
     @Test
@@ -90,6 +102,5 @@ class StationDetailsTest {
         val details = Snapshot(snapshot.meta, file).stationDetails(7)!!
         assertEquals("Q8", details.displayName)
         assertEquals(FuelKind.OTHER, details.rows[0].kind)
-        assertEquals(listOf("Idrogeno"), details.mainRows.map { it.name }) // no standard fuel at all
     }
 }

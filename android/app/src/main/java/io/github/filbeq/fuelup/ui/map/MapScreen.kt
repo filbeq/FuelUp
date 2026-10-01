@@ -142,8 +142,13 @@ fun MapScreen(
         sheetContent = {
             Column(Modifier.fillMaxWidth().onGloballyPositioned { sheetTopPx = it.positionInWindow().y - handleHeightPx }) {
                 shownDetails?.let {
-                    StationSheetHeader(it, Modifier.onSizeChanged { size -> headerHeightPx = size.height })
-                    StationSheetBody(it)
+                    StationSheetHeader(
+                        details = it,
+                        choice = state.choice,
+                        ranked = state.ranking[it.id],
+                        modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
+                    )
+                    StationSheetBody(it, state.choice)
                 }
             }
         },

@@ -1,11 +1,15 @@
 package io.github.filbeq.fuelup.ui.station
 
+import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
 import io.github.filbeq.fuelup.data.PriceEntry
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationsFile
+import java.text.NumberFormat
 import java.time.Instant
+import java.util.Locale
+import kotlin.math.abs
 
 /** One price at a station. */
 data class PriceInfo(val priceMilli: Long, val updated: Instant)
@@ -42,20 +46,6 @@ data class StationDetails(
     val rows: List<FuelRow>,
 ) {
     val displayName: String get() = name.ifEmpty { brand }
-
-    /**
-     * Prices for the collapsed sheet: standard petrol and diesel; if the station
-     * sells neither, its first standard fuel (or, failing that, its first fuel).
-     * Step 6 will replace this with the fuel the user picks.
-     */
-    val mainRows: List<FuelRow>
-        get() {
-            val petrolAndDiesel = listOfNotNull(
-                rows.firstOrNull { it.std && it.kind == FuelKind.PETROL },
-                rows.firstOrNull { it.std && it.kind == FuelKind.DIESEL },
-            )
-            return petrolAndDiesel.ifEmpty { listOfNotNull(rows.firstOrNull { it.std } ?: rows.firstOrNull()) }
-        }
 }
 
 /** Standard fuel names that are fully described by their localized type label. */
@@ -111,3 +101,13 @@ private fun Station.toDetails(file: StationsFile): StationDetails {
         rows = rows,
     )
 }
+
+/** True if [row] is the product a [FuelChoice] refers to (the standard one of its type). */
+fun FuelRow.isChosen(choice: FuelChoice): Boolean = std && kind == choice.fuel
+
+/** "3,5" / "3.5" / "20": cents (from thousandths of a euro), at most one decimal. */
+fun formatCents(diffMilli: Double, locale: Locale): String =
+    NumberFormat.getNumberInstance(locale).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 1
+    }.format(abs(diffMilli) / 10)

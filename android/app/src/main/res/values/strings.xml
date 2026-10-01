@@ -74,4 +74,17 @@
     <string name="legend_to_verify">To verify</string>
     <!-- Cluster label: cheapest price in the group; %1$s = price like "1.990" -->
     <string name="cluster_from_price">from %1$s</string>
+
+    <!-- Station sheet: chosen fuel and comparison -->
+    <!-- %1$s = fuel and mode, e.g. "Petrol · Self" -->
+    <string name="station_does_not_sell">Doesn\'t sell %1$s</string>
+    <!-- %1$s = cents (e.g. "4.5"), %2$s = one of compare_group_* -->
+    <string name="compare_below">%1$s cents below the typical price %2$s</string>
+    <string name="compare_above">%1$s cents above the typical price %2$s</string>
+    <string name="compare_in_line">In line with the typical price %1$s</string>
+    <string name="compare_not_compared">Too few stations nearby to compare</string>
+    <string name="compare_to_verify">%1$s cents below the typical price %2$s: unusually low, check it at the pump</string>
+    <string name="compare_group_road">nearby</string>
+    <string name="compare_group_motorway">at nearby motorway service areas</string>
+    <string name="compare_group_duty_free">in the duty-free area</string>
 </resources>

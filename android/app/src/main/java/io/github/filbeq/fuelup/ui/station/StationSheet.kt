@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,7 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -40,19 +44,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.data.CompareGroup
+import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
+import io.github.filbeq.fuelup.data.PriceClass
+import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.RefreshPolicy
+import io.github.filbeq.fuelup.data.ServiceMode
+import io.github.filbeq.fuelup.map.StationIcons
 import io.github.filbeq.fuelup.ui.map.fuelLabel
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 /**
  * Header of the station sheet: what's visible when the sheet is collapsed
- * (name, brand, main prices). [StationSheetBody] follows it when expanded.
+ * (name, brand, and the price of the chosen fuel with how it compares).
+ * [StationSheetBody] follows it when expanded. [ranked] is the station's
+ * price for [choice] (null if it doesn't sell it).
  */
 @Composable
-fun StationSheetHeader(details: StationDetails, modifier: Modifier = Modifier) {
-    val now = remember(details) { Instant.now() }
+fun StationSheetHeader(details: StationDetails, choice: FuelChoice, ranked: RankedPrice?, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
         Text(
             details.displayName,
@@ -73,15 +84,76 @@ fun StationSheetHeader(details: StationDetails, modifier: Modifier = Modifier) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            details.mainRows.forEach { row -> MainPrice(row, now) }
+        ChosenPrice(choice, ranked)
+    }
+}
+
+/** The chosen fuel's price, its class icon and the comparison in words. */
+@Composable
+private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?) {
+    val choiceLabel = buildString {
+        append(stringResource(fuelLabel(choice.fuel)))
+        if (choice.modeApplies) {
+            append(" · ")
+            append(stringResource(if (choice.mode == ServiceMode.SELF) R.string.mode_self else R.string.mode_served))
         }
+    }
+    if (ranked == null) {
+        Text(
+            stringResource(R.string.station_does_not_sell, choiceLabel),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG
+    val price = PriceInfo(ranked.priceMilli, Instant.ofEpochSecond(ranked.updatedEpochSeconds))
+    val now = remember(ranked) { Instant.now() }
+    Text(choiceLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val density = LocalDensity.current.density
+        val icon = remember(ranked.priceClass, density) {
+            StationIcons.draw(ranked.priceClass, density).asImageBitmap()
+        }
+        Image(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Text(formatPrice(price, perKg), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    }
+    Text(
+        comparisonText(ranked),
+        style = MaterialTheme.typography.bodyMedium,
+        // Neutral for "to verify" too: an unusual price is not a warning about the station.
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Text(
+        reportedText(price, now),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** "4,5 cent sotto il prezzo tipico della zona", "In linea con…", "Prezzo da verificare…". */
+@Composable
+private fun comparisonText(ranked: RankedPrice): String {
+    val where = stringResource(
+        when (ranked.group) {
+            CompareGroup.ROAD -> R.string.compare_group_road
+            CompareGroup.MOTORWAY -> R.string.compare_group_motorway
+            CompareGroup.DUTY_FREE -> R.string.compare_group_duty_free
+        },
+    )
+    val cents = ranked.diffFromMedianMilli?.let { formatCents(it, LocalConfiguration.current.locales[0]) }
+    return when (ranked.priceClass) {
+        PriceClass.CHEAP -> stringResource(R.string.compare_below, cents!!, where)
+        PriceClass.EXPENSIVE -> stringResource(R.string.compare_above, cents!!, where)
+        PriceClass.AVERAGE -> stringResource(R.string.compare_in_line, where)
+        PriceClass.NOT_COMPARED -> stringResource(R.string.compare_not_compared)
+        PriceClass.TO_VERIFY -> stringResource(R.string.compare_to_verify, cents!!, where)
     }
 }
 
 /** The rest of the sheet, visible when expanded: address, Navigate, all prices. */
 @Composable
-fun StationSheetBody(details: StationDetails, modifier: Modifier = Modifier) {
+fun StationSheetBody(details: StationDetails, choice: FuelChoice, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val now = remember(details) { Instant.now() }
     Column(
@@ -103,32 +175,13 @@ fun StationSheetBody(details: StationDetails, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.action_navigate))
         }
-        PriceTable(details, now)
-    }
-}
-
-@Composable
-private fun MainPrice(row: FuelRow, now: Instant) {
-    val price = row.preferred ?: return
-    val (title, _) = fuelTitle(row, kindLabel(row.kind))
-    Column {
-        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            formatPrice(price, row.perKg),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            stringResource(if (price == row.self) R.string.mode_self else R.string.mode_served),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        PriceTable(details, choice, now)
     }
 }
 
 /** One row per fuel; columns Self and Served. */
 @Composable
-private fun PriceTable(details: StationDetails, now: Instant) {
+private fun PriceTable(details: StationDetails, choice: FuelChoice, now: Instant) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row {
             Text(
@@ -152,9 +205,19 @@ private fun PriceTable(details: StationDetails, now: Instant) {
         }
         details.rows.forEach { row ->
             val (title, subtitle) = fuelTitle(row, kindLabel(row.kind))
-            Row(verticalAlignment = Alignment.Top) {
+            // The chosen fuel's row is highlighted.
+            val rowModifier = if (row.isChosen(choice)) {
+                Modifier.background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small)
+            } else {
+                Modifier
+            }
+            Row(rowModifier.padding(4.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1.2f)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (row.isChosen(choice)) FontWeight.SemiBold else null,
+                    )
                     if (subtitle != null) {
                         Text(
                             subtitle,
