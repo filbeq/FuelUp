@@ -6,9 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.ui.about.AboutScreen
 import io.github.filbeq.fuelup.ui.map.MapScreen
+import io.github.filbeq.fuelup.ui.map.MapViewModel
 
 /**
  * Top-level UI: the map, or the About screen on top of it.
@@ -18,7 +21,8 @@ import io.github.filbeq.fuelup.ui.map.MapScreen
  * the user left it.
  */
 @Composable
-fun FuelUpApp() {
+fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
+    val mapState by mapViewModel.state.collectAsStateWithLifecycle()
     var showAbout by rememberSaveable { mutableStateOf(false) }
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
 
@@ -27,6 +31,8 @@ fun FuelUpApp() {
         AboutScreen(onBack = { showAbout = false })
     } else {
         MapScreen(
+            state = mapState,
+            onRetry = mapViewModel::retry,
             camera = camera,
             onCameraChange = { camera = it },
             onOpenAbout = { showAbout = true },

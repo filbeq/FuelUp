@@ -27,6 +27,8 @@ import io.github.filbeq.fuelup.map.MapLibreMap
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
+    state: MapUiState,
+    onRetry: () -> Unit,
     camera: MapCamera,
     onCameraChange: (MapCamera) -> Unit,
     onOpenAbout: () -> Unit,
@@ -54,6 +56,11 @@ fun MapScreen(
                 camera = camera,
                 onCameraIdle = onCameraChange,
                 modifier = Modifier.fillMaxSize(),
+            )
+            DataStatusCard(
+                state = state,
+                onRetry = onRetry,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
             MapAttributionBar(
                 onClick = onOpenAbout,

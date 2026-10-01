@@ -26,4 +26,18 @@
     <string name="about_open_license">Open the license</string>
     <string name="about_map_title">Map</string>
     <string name="about_map_body">Map data and tiles:</string>
+
+    <!-- Data status (map screen) -->
+    <string name="status_loading">Downloading prices…</string>
+    <!-- %1$s = date, %2$s = time, both in Italian time, e.g. "Sep 30", "8:00 AM" -->
+    <string name="status_prices_at">Prices of %1$s, %2$s</string>
+    <!-- java.time patterns for the date and time above -->
+    <string name="prices_date_pattern">MMM d</string>
+    <string name="prices_time_pattern">h:mm a</string>
+    <string name="status_offline">Offline: showing saved prices</string>
+    <string name="status_update_failed">Couldn\'t check for new prices</string>
+    <string name="error_no_connection">No connection. Connect to the internet to download prices.</string>
+    <string name="error_download_failed">Couldn\'t download prices. Try again later.</string>
+    <string name="error_update_required">A newer version of FuelUp is needed to read the latest prices. Please update the app.</string>
+    <string name="action_retry">Retry</string>
 </resources>

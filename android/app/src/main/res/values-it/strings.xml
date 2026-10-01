@@ -23,4 +23,16 @@
     <string name="about_open_license">Apri la licenza</string>
     <string name="about_map_title">Mappa</string>
     <string name="about_map_body">Dati e tasselli della mappa:</string>
+
+    <!-- Stato dei dati (mappa) -->
+    <string name="status_loading">Download dei prezzi…</string>
+    <string name="status_prices_at">Prezzi del %1$s, ore %2$s</string>
+    <string name="prices_date_pattern">dd/MM</string>
+    <string name="prices_time_pattern">H:mm</string>
+    <string name="status_offline">Offline: prezzi salvati</string>
+    <string name="status_update_failed">Impossibile verificare nuovi prezzi</string>
+    <string name="error_no_connection">Nessuna connessione. Connettiti a internet per scaricare i prezzi.</string>
+    <string name="error_download_failed">Impossibile scaricare i prezzi. Riprova più tardi.</string>
+    <string name="error_update_required">Serve una versione più recente di FuelUp per leggere i prezzi aggiornati. Aggiorna l\'app.</string>
+    <string name="action_retry">Riprova</string>
 </resources>
