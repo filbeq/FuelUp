@@ -18,7 +18,7 @@ REAL_NAMES = {
     "Benzina speciale": P, "Benzina WR 100": P, "Diesel Shell V Power": D,
     "DieselMax": D, "HVO100": D, "S-Diesel": D, "Gasolio artico": D,
     "Benzina Shell V Power": P, "Excellium Diesel": D, "Gasolio Oro Diesel": D,
-    "REHVO": D, "F101": P, "Diesel HVO": D, "Gasolio Energy D": D, "E-DIESEL": D,
+    "REHVO": D, "F101": FuelType.OTHER, "Diesel HVO": D, "Gasolio Energy D": D, "E-DIESEL": D,
     "Gasolio Ecoplus": D, "GP DIESEL": D, "Gasolio Artico": D,
     "Benzina Energy 98 ottani": P, "BCHVO": D, "Gasolio Bio HVO": D,
     "Benzina Plus 98": P, "Gasolio HVO": D, "Gasolio Gelo": D, "Gasolio Alpino": D,
@@ -26,7 +26,7 @@ REAL_NAMES = {
     "Blu Diesel Alpino": D, "HiQ Perform B100 Ottani": P, "Gasolio Prestazionale": D,
     "Gasolio Plus": D, "Diesel HVO Energy": D, "Verde speciale": P,
     "HVOvolution": D, "HVO Energy Diesel": D, "Benzina Speciale 98 Ottani": P,
-    "F-101": P, "Gasolio Artico Igloo": D, "V-Power Diesel": D,
+    "F-101": FuelType.OTHER, "Gasolio Artico Igloo": D, "V-Power Diesel": D,
     "Benzina 100 ottani": P, "GASOLIO HVO": D, "Benzina 102 Ottani": P,
 }
 
@@ -63,6 +63,13 @@ class ClassifyTest(unittest.TestCase):
         self.assertFalse(info.std)
         self.assertEqual(classify("Metano Bio").type, CNG)
         self.assertEqual(classify("Metano Bio").unit, Unit.KILOGRAM)
+
+    def test_unconfirmed_known_name_is_other(self):
+        info = classify("F101")
+        self.assertEqual(info.type, FuelType.OTHER)
+        self.assertEqual(info.unit, Unit.LITRE)
+        self.assertTrue(info.known)  # deliberate, so not logged as unknown
+        self.assertFalse(info.std)
 
     def test_unrecognizable_name_is_other(self):
         info = classify("AdBlue")

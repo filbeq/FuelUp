@@ -60,8 +60,6 @@ _SPECIAL = {
     "hiq perform b100 ottani": FuelType.PETROL,
     "v-power": FuelType.PETROL,
     "verde speciale": FuelType.PETROL,
-    "f101": FuelType.PETROL,
-    "f-101": FuelType.PETROL,
     # Diesel, including HVO (renewable diesel)
     "gasolio speciale": FuelType.DIESEL,
     "gasolio premium": FuelType.DIESEL,
@@ -98,6 +96,9 @@ _SPECIAL = {
     "diesel hvo energy": FuelType.DIESEL,
     "rehvo": FuelType.DIESEL,
     "bchvo": FuelType.DIESEL,
+    # Fuel kind not confirmed yet (San Marco Petroli product): OTHER until it is.
+    "f101": FuelType.OTHER,
+    "f-101": FuelType.OTHER,
 }
 
 # Fallback for names never seen before. Order matters: "V-Power Diesel" must be
