@@ -17,6 +17,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Debug builds only carry MapLibre's native code for 64-bit ARM phones
+            // (~25 MB instead of ~62 MB per install). For an x86_64 emulator, add
+            // "x86_64" here. Release bundles are unaffected: the Play Store delivers
+            // only the code each phone needs.
+            ndk { abiFilters += "arm64-v8a" }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
