@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Italian. Every translatable string in values/strings.xml must be here too
+     (lint's MissingTranslation check fails the build otherwise). -->
+<resources>
+</resources>
