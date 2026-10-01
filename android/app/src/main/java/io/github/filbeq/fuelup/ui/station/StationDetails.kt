@@ -1,0 +1,122 @@
+package io.github.filbeq.fuelup.ui.station
+
+import io.github.filbeq.fuelup.data.PriceEntry
+import io.github.filbeq.fuelup.data.Snapshot
+import io.github.filbeq.fuelup.data.Station
+import io.github.filbeq.fuelup.data.StationsFile
+import java.time.Instant
+
+/** Fuel families, matching the pipeline's `type` values. */
+enum class FuelKind {
+    PETROL, DIESEL, LPG, CNG, LNG, OTHER;
+
+    companion object {
+        /** Unknown future types are shown as OTHER instead of failing. */
+        fun of(type: String): FuelKind = entries.firstOrNull { it.name == type } ?: OTHER
+    }
+}
+
+/** One price at a station. */
+data class PriceInfo(val priceMilli: Long, val updated: Instant)
+
+/** One fuel at a station, with its self-service and served prices (either may be missing). */
+data class FuelRow(
+    /** Name as published by MIMIT, e.g. "Benzina", "L-GNC", "Blue Diesel". */
+    val name: String,
+    val kind: FuelKind,
+    /** Standard fuel (true) or branded/special product (false). */
+    val std: Boolean,
+    /** Priced per kilogram (methane, LNG) rather than per litre. */
+    val perKg: Boolean,
+    val self: PriceInfo?,
+    val served: PriceInfo?,
+) {
+    /** The price to show when there's room for only one: self-service if offered. */
+    val preferred: PriceInfo? get() = self ?: served
+}
+
+/** Everything the station sheet shows, computed from the cached data. */
+data class StationDetails(
+    val id: Int,
+    /** MIMIT station name; may be empty (show [brand] instead). */
+    val name: String,
+    val brand: String,
+    val motorway: Boolean,
+    val address: String,
+    val municipality: String,
+    val province: String,
+    val lat: Double,
+    val lon: Double,
+    /** One row per fuel, in the data's order (by type, standard fuel first). */
+    val rows: List<FuelRow>,
+) {
+    val displayName: String get() = name.ifEmpty { brand }
+
+    /**
+     * Prices for the collapsed sheet: standard petrol and diesel; if the station
+     * sells neither, its first standard fuel (or, failing that, its first fuel).
+     * Step 6 will replace this with the fuel the user picks.
+     */
+    val mainRows: List<FuelRow>
+        get() {
+            val petrolAndDiesel = listOfNotNull(
+                rows.firstOrNull { it.std && it.kind == FuelKind.PETROL },
+                rows.firstOrNull { it.std && it.kind == FuelKind.DIESEL },
+            )
+            return petrolAndDiesel.ifEmpty { listOfNotNull(rows.firstOrNull { it.std } ?: rows.firstOrNull()) }
+        }
+}
+
+/** Standard fuel names that are fully described by their localized type label. */
+private val PLAIN_STANDARD_NAMES = setOf("benzina", "gasolio", "gpl", "metano", "gnl")
+
+/**
+ * Title and optional subtitle for a fuel row, given the localized label of its type.
+ * - standard fuel: "Benzina"; with a non-plain name: "Metano (L-GNC)"
+ * - special fuel: its own name, with the type underneath ("Blue Diesel" / "Gasolio")
+ */
+fun fuelTitle(row: FuelRow, kindLabel: String): Pair<String, String?> = when {
+    !row.std -> row.name to kindLabel
+    row.name.lowercase() in PLAIN_STANDARD_NAMES -> kindLabel to null
+    else -> "$kindLabel (${row.name})" to null
+}
+
+/** Details of station [id], or null if it isn't in the data. */
+fun Snapshot.stationDetails(id: Int): StationDetails? {
+    val stations = stations.stations
+    // Stations are sorted by id (the pipeline writes them that way).
+    val index = stations.binarySearch { it.id.compareTo(id) }
+    if (index < 0) return null
+    return stations[index].toDetails(this.stations)
+}
+
+private fun Station.toDetails(file: StationsFile): StationDetails {
+    val rows = prices
+        .groupBy { it[PriceEntry.FUEL].toInt() } // keeps the data's order
+        .map { (fuelIndex, entries) ->
+            val fuel = file.fuels[fuelIndex]
+            fun price(self: Boolean) = entries.firstOrNull { (it[PriceEntry.SELF] == 1L) == self }?.let {
+                PriceInfo(it[PriceEntry.PRICE_MILLI], Instant.ofEpochSecond(it[PriceEntry.UPDATED]))
+            }
+            FuelRow(
+                name = fuel.name,
+                kind = FuelKind.of(fuel.type),
+                std = fuel.std,
+                perKg = fuel.unit == "KG",
+                self = price(self = true),
+                served = price(self = false),
+            )
+        }
+    return StationDetails(
+        id = id,
+        name = name,
+        brand = file.brands.getOrElse(brand) { "" },
+        motorway = motorway == 1,
+        address = address,
+        municipality = municipality,
+        province = province,
+        lat = lat,
+        lon = lon,
+        rows = rows,
+    )
+}
