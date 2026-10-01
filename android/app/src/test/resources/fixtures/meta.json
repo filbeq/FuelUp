@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "dataDate": "2026-09-30",
+  "pricesAt": "2026-09-30T08:00:00+02:00",
+  "generatedAt": "2026-10-01T07:12:03Z",
+  "stations": 3,
+  "prices": 10,
+  "file": "stations.json",
+  "bytes": 1060,
+  "sha256": "905f507ef999d0dab0abcef543fde7db4ba44ad4f0d2d9ed98ad51ec10d4606c",
+  "source": "Ministero delle Imprese e del Made in Italy — Osservaprezzi Carburanti",
+  "license": "IODL-2.0"
+}
