@@ -18,7 +18,7 @@ released under the [Italian Open Data License 2.0 (IODL 2.0)](https://www.dati.g
 ```
 pipeline/   Python data pipeline: download, clean and publish the price data as JSON
 android/    Android app (Kotlin + Jetpack Compose) — not started yet
-.github/    GitHub Actions workflows — not started yet
+.github/    GitHub Actions workflow that publishes the data
 ```
 
 ## Pipeline
@@ -39,4 +39,38 @@ _To do (roadmap step 3)._
 
 ## Automated publishing
 
-_To do (roadmap step 2)._
+The workflow [`.github/workflows/publish-data.yml`](.github/workflows/publish-data.yml)
+runs the tests and the pipeline, then publishes the result to GitHub Pages. It runs
+twice a day (07:30 and 15:30 UTC; MIMIT publishes around 06:45 UTC) and on demand.
+If the tests or the pipeline fail, nothing is deployed and the previous data stays
+online. The data is never committed to the repository.
+
+Published files:
+
+| File | URL |
+|---|---|
+| Station data | https://filbeq.github.io/FuelUp/stations.json |
+| Metadata (data date, counts, checksum) | https://filbeq.github.io/FuelUp/meta.json |
+
+### One-time setup
+
+In the repository: **Settings → Pages → Build and deployment → Source:
+"GitHub Actions"**.
+
+### Run it manually
+
+1. Open the repository's **Actions** tab.
+2. Select **Publish fuel data** in the list on the left.
+3. Click **Run workflow** (branch `main`) → **Run workflow**.
+
+The run takes about a minute. When it is green, the `deploy` job shows the
+published URL. To check what is online:
+
+```sh
+curl -s https://filbeq.github.io/FuelUp/meta.json
+```
+
+`dataDate` there is the date the prices refer to (08:00 Italian time).
+
+Note: GitHub disables scheduled workflows in public repositories after 60 days
+without commits; re-enable it from the Actions tab if that happens.
