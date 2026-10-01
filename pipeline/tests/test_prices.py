@@ -1,7 +1,7 @@
 """Price parser tests.
 
 fixtures/prices.csv holds real rows from the 2026-09-30 MIMIT file (ids below 900000)
-plus synthetic rows (ids 9000xx, X1, and the last two 54386 rows) for quirks not
+plus synthetic rows (ids 9000xx, X1, and the last three 54386 rows) for quirks not
 present in that day's data.
 """
 
@@ -64,7 +64,7 @@ class PriceFixtureTest(unittest.TestCase):
         self.assertEqual(self.prices[(4036, "GNL", True)].fuel.type, FuelType.LNG)
 
     def test_unknown_fuel_is_kept_as_other_and_noted(self):
-        p = self.prices[(900011, "Etanolo E85", False)]
+        p = self.prices[(54386, "Etanolo E85", False)]
         self.assertEqual(p.fuel.type, FuelType.OTHER)
         self.assertEqual(self.report.notes["unknown fuel name 'Etanolo E85' -> OTHER"], 1)
 

@@ -38,9 +38,12 @@ class DropReport:
             samples.append(str(ident))
 
     def log(self, logger: logging.Logger) -> None:
-        logger.info(
-            "%s: %d rows read, %d dropped", self.name, self.rows_read, self.dropped_total
-        )
+        if self.rows_read:
+            logger.info(
+                "%s: %d rows read, %d dropped", self.name, self.rows_read, self.dropped_total
+            )
+        else:
+            logger.info("%s: %d dropped", self.name, self.dropped_total)
         for reason, count in self.dropped.most_common():
             logger.info("  dropped %6d  %s  e.g. %s", count, reason, ", ".join(self.samples(reason)))
         for reason, count in self.notes.most_common():
