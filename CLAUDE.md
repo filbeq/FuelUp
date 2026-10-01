@@ -150,6 +150,8 @@ small enough to be tested on a real phone before moving on.
 2. GitHub Action + GitHub Pages publishing.
 3. Android skeleton: builds, runs, shows a MapLibre map (OpenFreeMap), i18n set up.
 4. Load JSON, show clustered station markers (MapLibre GeoJSON clustering).
+   Map labels follow the app language (`name:it` / `name:en`), falling back
+   to the local name (`name`).
 5. Station detail: prices per fuel, self/served, last update date.
 6. Fuel filter + marker colors by relative price (cheap → expensive).
 7. "Near me" with location permission.
