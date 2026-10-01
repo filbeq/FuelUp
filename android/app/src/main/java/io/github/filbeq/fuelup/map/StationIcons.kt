@@ -17,8 +17,12 @@ import io.github.filbeq.fuelup.data.PriceClass
 object StationIcons {
     const val CHEAP_COLOR = 0xFF009E73.toInt()      // bluish green
     const val EXPENSIVE_COLOR = 0xFFD55E00.toInt()  // vermillion
-    const val NEUTRAL_COLOR = 0xFF7D8590.toInt()    // grey
+    // Light grey: also differs in lightness from both colours, so "average" stays
+    // distinct from "cheap" even when green looks grey (red-green colour blindness).
+    const val NEUTRAL_COLOR = 0xFFBDC3CB.toInt()
     private const val OUTLINE_COLOR = 0xFFFFFFFF.toInt()
+    /** Glyph on the light grey "to verify" marker (white would be too faint). */
+    private const val DARK_GLYPH_COLOR = 0xFF2B3036.toInt()
 
     private const val SIZE_DP = 20f
 
@@ -68,6 +72,7 @@ object StationIcons {
             PriceClass.CHEAP -> canvas.drawPath(chevron(center, center - h / 2, w, h, down = true), glyph)
             PriceClass.EXPENSIVE -> canvas.drawPath(chevron(center, center + h / 2, w, h, down = false), glyph)
             PriceClass.TO_VERIFY -> {
+                glyph.color = DARK_GLYPH_COLOR
                 glyph.style = Paint.Style.FILL
                 glyph.textAlign = Paint.Align.CENTER
                 glyph.isFakeBoldText = true
