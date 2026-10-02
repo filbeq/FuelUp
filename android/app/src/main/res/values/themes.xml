@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Window theme only: the UI itself is styled by Compose (ui/theme). -->
-    <style name="Theme.FuelUp" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Window theme only: the UI itself is styled by Compose (ui/theme).
+         AppCompat-based so that AppCompatDelegate can switch the app language
+         (also on Android < 13) and light/dark mode. DayNight picks light or
+         dark from the current mode; window_background has a night variant. -->
+    <style name="Theme.FuelUp" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
 </resources>
