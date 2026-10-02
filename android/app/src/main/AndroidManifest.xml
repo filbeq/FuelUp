@@ -2,15 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- "My location": approximate position only, asked when the button is
-         tapped, foreground only (no background location). -->
+    <!-- "My location": asked when the button is tapped, foreground only (no
+         background location). Approximate is enough; precise is asked too because
+         on Android 11 and older approximate-only apps can't use GPS (on 12+ the
+         user picks). See CLAUDE.md, step 7. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-    <!-- MapLibre's library also asks for these; FuelUp doesn't need them
-         (approximate location is enough, see CLAUDE.md step 7). -->
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        tools:node="remove" />
+    <!-- MapLibre's library also asks for this; FuelUp doesn't need it. -->
     <uses-permission
         android:name="android.permission.ACCESS_WIFI_STATE"
         tools:node="remove" />
