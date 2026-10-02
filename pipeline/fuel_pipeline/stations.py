@@ -21,6 +21,19 @@ LAT_RANGE = (35.0, 47.2)
 LON_RANGE = (6.5, 18.6)
 COORD_DECIMALS = 5  # ~1 m, plenty for a map pin
 
+# Misplaced stations: coordinates are entered by operators and sometimes copied
+# from another registration (e.g. a Sorrento station drawn on top of one in
+# Ventimiglia). A station is dropped when no station of its own province is within
+# MISPLACED_KM, but a station of another province is MISPLACED_RATIO times closer
+# than the nearest one of its own. Real islands (Ustica, Linosa, ...) pass: nothing
+# of another province is near them either.
+MISPLACED_KM = 25.0
+MISPLACED_RATIO = 3.0
+KM_PER_DEG_LAT = 111.2
+# Grid cells at least MISPLACED_KM wide (in longitude, at Italy's northern tip), so
+# the 3x3 cells around a station hold every station within MISPLACED_KM.
+_CELL_DEG = 0.35
+
 # Some station names carry a junk " | gestori.prezzibenzina.it" suffix, which also
 # breaks the column count (the "|" is the separator).
 _JUNK_RE = re.compile(r"\s*\|\s*gestori\.prezzibenzina\.it", re.IGNORECASE)
@@ -99,7 +112,60 @@ def parse_stations(lines: list[str]) -> StationFile:
             lon=coords[1],
         )
 
+    _drop_misplaced(stations, report)
     return StationFile(extraction_date, stations, report)
+
+
+def _drop_misplaced(stations: dict[int, Station], report: DropReport) -> None:
+    """Drop stations drawn in another province (see MISPLACED_KM)."""
+    by_province: dict[str, list[Station]] = {}
+    cells: dict[tuple[str, int, int], list[Station]] = {}
+    for s in stations.values():
+        by_province.setdefault(s.province, []).append(s)
+        cells.setdefault((s.province, *_cell(s)), []).append(s)
+
+    misplaced = []
+    for s in stations.values():
+        row, col = _cell(s)
+        near = (
+            o
+            for r in (row - 1, row, row + 1)
+            for c in (col - 1, col, col + 1)
+            for o in cells.get((s.province, r, c), ())
+        )
+        # Most stations have one of their own province nearby: cheap check first.
+        if any(_km(s, o) <= MISPLACED_KM for o in near if _other_spot(s, o)):
+            continue
+        own = min((_km(s, o) for o in by_province[s.province] if _other_spot(s, o)), default=None)
+        if own is None:
+            continue  # the only station of its province: nothing to compare with
+        other = min((_km(s, o) for o in stations.values() if o.province != s.province), default=None)
+        if other is not None and other * MISPLACED_RATIO < own:
+            misplaced.append((s, own, other))
+
+    for s, own, other in misplaced:
+        del stations[s.id]
+        report.drop(
+            "coordinates in another province",
+            f"{s.id} {s.municipality} ({s.province}): {own:.0f} km from own province, "
+            f"{other:.1f} km from another",
+        )
+
+
+def _other_spot(s: Station, o: Station) -> bool:
+    """A different station at different coordinates (a copy of s's own doesn't count)."""
+    return o.id != s.id and (o.lat, o.lon) != (s.lat, s.lon)
+
+
+def _cell(s: Station) -> tuple[int, int]:
+    return math.floor(s.lat / _CELL_DEG), math.floor(s.lon / _CELL_DEG)
+
+
+def _km(a: Station, b: Station) -> float:
+    """Distance in km; a flat approximation, fine at these scales."""
+    x = (a.lon - b.lon) * KM_PER_DEG_LAT * math.cos(math.radians((a.lat + b.lat) / 2))
+    y = (a.lat - b.lat) * KM_PER_DEG_LAT
+    return math.hypot(x, y)
 
 
 def _recover_fields(fields: list[str]) -> list[str] | None:

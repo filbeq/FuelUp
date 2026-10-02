@@ -53,6 +53,7 @@ https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati
 | Station rows with extra `\|` (junk ` \| gestori.prezzibenzina.it` in names) | Rebuilt using the station type column as an anchor; junk removed |
 | Tabs, leading/trailing/double spaces | Collapsed to single spaces, trimmed |
 | Missing, invalid, zero or out-of-Italy coordinates | Station dropped |
+| Coordinates in another province (e.g. copied from another registration: a Sorrento station drawn in Ventimiglia) | Station dropped when no station of its own province is within 25 km but one of another province is over 3× closer than its own; islands pass, since nothing else is near them |
 | Coordinates with 15 decimals | Rounded to 5 (~1 m) |
 | Duplicate station id | First one kept |
 | Operator (`Gestore`) | Not exported: unused, and often a person's name |

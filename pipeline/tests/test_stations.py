@@ -118,5 +118,49 @@ class StationHeaderTest(unittest.TestCase):
         self.assertEqual(result.report.notes["empty station name"], 1)
 
 
+class MisplacedStationTest(unittest.TestCase):
+    """Real rows from the 2026-09-30 file (plus synthetic ids 9001xx)."""
+
+    ROWS = [
+        # Sorrento station registered with the coordinates of the Ventimiglia one.
+        "62969|ENIMOOV S.P.A.|Agip Eni|Stradale|1235 VENTIMIGLIA|CORSO GENOVA  84/C 0204  |VENTIMIGLIA|IM|43.78874|7.6213346",
+        "62970|ENIMOOV S.P.A.|Agip Eni|Stradale|8144 SORRENTO|CORSO ITALIA  No279  |SORRENTO|NA|43.78874|7.6213346",
+        "20947|DE NICOLA ROBERTO|Agip Eni|Stradale|eni|C.so Genova 84 18039|VENTIMIGLIA|IM|43.788566639001374|7.6211816325409245",
+        "35993|ENERGY OIL|Agip Eni|Stradale|08144|CORSO ITALIA 279 80067|SORRENTO|NA|40.62665221730716|14.382114708423615",
+        # Islands: far from the rest of their province, but no other province is near.
+        "40673|COSTANZO|Pompe Bianche|Stradale|Costanzo|CONTRADA GUITGIA SN 92010|LAMPEDUSA E LINOSA|AG|35.500892388423836|12.60155439376831",
+        "60141|NAUTILUS|Pompe Bianche|Stradale|LINOSA|VIA POZZOLANA DI PONENTE SNC 92010|LAMPEDUSA E LINOSA|AG|35.861987|12.857395",
+        "59183|ENIMOOV S.P.A.|Agip Eni|Stradale|19829 AGRIGENTO|SS.189 KM. 64+649|AGRIGENTO|AG|37.333935|13.595533",
+        "54872|G P S.R.L.|Agip Eni|Stradale|Eni 51929|RESURREZIONE 87 90146|PALERMO|PA|38.165539468413655|13.320088127647391",
+        # Near a province border: 1 km from another province, 10 km from its own.
+        "900101|T|Q8|Stradale|BORDER|VIA A|PAESE A|AA|44.0|11.0",
+        "900102|T|Q8|Stradale|OWN|VIA B|PAESE B|AA|44.09|11.0",
+        "900103|T|Q8|Stradale|NEIGHBOUR|VIA C|PAESE C|BB|43.991|11.0",
+        "900104|T|Q8|Stradale|NEIGHBOUR 2|VIA D|PAESE D|BB|43.9|11.0",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = parse_stations(HEADER + cls.ROWS)
+
+    def test_copied_coordinates_in_another_province_are_dropped(self):
+        self.assertNotIn(62970, self.result.stations)
+        self.assertIn(62969, self.result.stations)
+        self.assertEqual(self.result.report.dropped["coordinates in another province"], 1)
+        self.assertTrue(self.result.report.samples("coordinates in another province")[0].startswith("62970 "))
+
+    def test_islands_are_kept(self):
+        for station_id in (40673, 60141, 54872):
+            self.assertIn(station_id, self.result.stations)
+
+    def test_station_near_a_province_border_is_kept(self):
+        self.assertIn(900101, self.result.stations)
+        self.assertIn(900103, self.result.stations)
+
+    def test_only_station_of_its_province_is_kept(self):
+        result = parse_stations(HEADER + self.ROWS[:1] + ["1|op|Q8|Stradale|X|VIA X|NAPOLI|NA|43.79|7.62"])
+        self.assertIn(1, result.stations)
+
+
 if __name__ == "__main__":
     unittest.main()
