@@ -249,12 +249,24 @@ small enough to be tested on a real phone before moving on.
   - Drawn honestly: a translucent disc of the reported accuracy plus a small
     centre mark (no precise-looking dot); the search radius as a dashed
     circle; the camera fits it between the top controls and the sheet.
+    Colours follow the map's darkness (`LocationColor*`, like the clusters),
+    every line has a halo in the opposite tone. Disc and circle lie under the
+    stations; the centre mark is a symbol above them, so colliding price
+    labels/pills are left out rather than half-covered. Shown only while
+    "near me" is open.
   - List in the station sheet when no station is selected: radius chips
     5/10/20 km (default 10 km: median ~40 stations, ≥ 3 in 99% of places,
     measured), sort Price (default; "to verify" last) / Distance, both saved.
     Rows: class icon and words, price, brand, distance as the crow flies
     (whole km when the fix is worse than 500 m), motorway badge, report age.
     A row selects the station and shows it; Back returns to the list.
+    Only the header (title, sort, radius) is fixed; all rows scroll in one
+    list, back at the top when the sheet collapses.
+  - Empty-map tap: with a station selected, leaves it (back to the list as
+    it was, or nothing); otherwise lowers the list to its title row (kept,
+    so the circle on the map stays explained). Title, drag up or the
+    location button bring it back. Back: station → list → collapsed → closed;
+    minimised → closed.
   - Play Store: no background-location declaration needed; location never
     leaves the phone, so the Data safety form declares nothing collected.
     A privacy policy URL is still required for every app.
