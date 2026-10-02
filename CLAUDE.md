@@ -66,6 +66,14 @@ small enough to be tested on a real phone before moving on.
     some empty station names
   - empty coordinates (with empty name) and coordinates padded with spaces;
     zero/out-of-Italy coordinates are possible, handle them too
+  - coordinates copied from another registration (e.g. "8144 SORRENTO" drawn
+    on top of a Ventimiglia station): the pipeline drops a station whose
+    nearest same-province station is > 25 km away while another province's is
+    over 3× closer (islands pass: nothing else is near them). ~25 published
+    stations per day.
+  - ~140 sites with two registrations at identical coordinates (often the same
+    name, e.g. Sarni motorway areas with a separate diesel listing): both are
+    kept; the station sheet links the other one ("Also at this location").
   - stale prices, some from 2013: drop prices older than 8 days. `dtComu` a few
     minutes after 08:00 of the data date is normal (extraction lag).
   - typo prices such as `0.100` or `8.888`: drop via per-fuel plausible bounds
@@ -136,7 +144,8 @@ small enough to be tested on a real phone before moving on.
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
-  no Google dependency).
+  no Google dependency). Stations at identical coordinates link to each
+  other in the collapsed sheet (their markers overlap).
 - Fuel filter (step 6): standard product per type; Self/Servito only for petrol
   and diesel (LPG/methane/LNG are ~90–97% served-only); stations not selling the
   choice are hidden (not greyed); choice saved in SharedPreferences.
@@ -180,6 +189,12 @@ small enough to be tested on a real phone before moving on.
 - Clustering (step 4): 24k points, clustering is mandatory. Use MapLibre's
   built-in GeoJSON source clustering (`GeoJsonOptions().withCluster(true)`),
   not per-marker annotations.
+- Cluster labels (step 6d): the station count inside the circle; the "from"
+  price in a rounded pill (surface fill, cluster-colour outline, stretchable
+  image + `icon-text-fit`) under the circle, shown only where there is room.
+  Pills avoid each other and an invisible collision box over 60% of every
+  circle (100% hid most prices at national zoom). Tapping a pill zooms like
+  the circle.
 - Map attribution: "© OpenStreetMap contributors" plus the tile provider
   (OpenFreeMap, © OpenMapTiles) always visible in a corner of the map (OSMF
   guidelines), and listed with links in the About screen. MapLibre's own
@@ -236,6 +251,8 @@ small enough to be tested on a real phone before moving on.
    readable dark map style (fiord); Navigation 3 for map, settings and About.
 6c. UI fixes: settings switches + language dropdown, smaller translucent
    clusters sized by count, "Ink blue" palette (no green/orange/red in the UI).
+6d. Map fixes: drop stations placed in another province (pipeline), link
+   stations at the same spot, cluster count + "from" price pill.
 7. "Near me" with location permission.
 8. Later: favorites, search, price history, UI polish, Play Store prep.
    Note: the map view is rebuilt (~1 s style reload) when returning from

@@ -143,7 +143,7 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/data/StationRepository.kt` | Download, validation, file cache |
 | `java/…/data/RefreshPolicy.kt` | When to contact the server |
 | `java/…/data/DataSource.kt` | Where the data is published (one URL) |
-| `java/…/map/StationLayers.kt` | Stations as clustered markers, selection ring, tap handling (cluster → zoom in, station → select) |
+| `java/…/map/StationLayers.kt` | Stations as clustered markers (count in the circle, "from" price pill), selection ring, tap handling (cluster or pill → zoom in, station → select) |
 | `java/…/map/LabelLanguage.kt` | Map place names in the app language |
 | `java/…/map/StationIcons.kt` | Marker icons per price class (colour + shape), also used by the legend |
 | `java/…/data/FuelChoice.kt` | Chosen fuel/mode, its price per station, saved choice |
