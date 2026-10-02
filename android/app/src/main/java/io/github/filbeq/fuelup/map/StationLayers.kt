@@ -65,13 +65,12 @@ import kotlin.math.hypot
 data class MapLabels(val localeTag: String, val clusterPricePrefix: String, val clusterPriceSuffix: String)
 
 /**
- * Colours (ARGB) from the app theme. Clusters are neutral on purpose: the brand
- * green would read as "cheap". Station markers use [StationIcons].
+ * Colours (ARGB) from the app theme. Clusters use a UI colour, never a price
+ * colour. Station markers use [StationIcons].
  */
 data class StationColors(
-    val clusterFill: Int,
-    val clusterText: Int,
-    val stroke: Int,
+    /** Cluster outline; also its fill, at [StationLayers.CLUSTER_FILL_OPACITY]. */
+    val cluster: Int,
     val selected: Int,
     val labelText: Int,
     val labelHalo: Int,
@@ -102,7 +101,18 @@ object StationLayers {
 
     /** Above this zoom, stations are shown one by one. */
     private const val CLUSTER_MAX_ZOOM = 13
-    private const val CLUSTER_RADIUS = 50
+    /** How close (in screen pixels) stations must be to group together. */
+    private const val CLUSTER_RADIUS = 40
+
+    /**
+     * Circle radius (dp) by number of stations: 2–9, 10–49, 50–199, 200–999, 1000+.
+     * Clearly different steps, so the size says how many stations are inside.
+     */
+    private val CLUSTER_SIZES = listOf(10 to 12f, 50 to 16f, 200 to 21f, 1000 to 27f)
+    private const val CLUSTER_SMALLEST = 9f
+
+    /** Translucent fill so the map stays visible; the outline stays solid. */
+    const val CLUSTER_FILL_OPACITY = 0.3f
 
     private const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
@@ -154,13 +164,17 @@ object StationLayers {
             CircleLayer(CLUSTER_LAYER_ID, SOURCE_ID)
                 .withFilter(has("point_count"))
                 .withProperties(
-                    circleColor(colors.clusterFill),
-                    // Bigger circles for bigger groups; big enough for "da 1,990".
+                    circleColor(colors.cluster),
+                    circleOpacity(CLUSTER_FILL_OPACITY),
                     circleRadius(
-                        step(get("point_count"), literal(22f), stop(50, 24f), stop(250, 27f), stop(1000, 30f)),
+                        step(
+                            get("point_count"),
+                            literal(CLUSTER_SMALLEST),
+                            *CLUSTER_SIZES.map { (count, radius) -> stop(count, radius) }.toTypedArray(),
+                        ),
                     ),
-                    circleStrokeColor(colors.stroke),
-                    circleStrokeWidth(1.5f),
+                    circleStrokeColor(colors.cluster),
+                    circleStrokeWidth(2f),
                 ),
         )
         style.addLayer(
@@ -181,7 +195,11 @@ object StationLayers {
                     ),
                     textFont(arrayOf(font)),
                     textSize(11f),
-                    textColor(colors.clusterText),
+                    // On small circles the text is wider than the circle: the halo
+                    // keeps it readable over the map.
+                    textColor(colors.labelText),
+                    textHaloColor(colors.labelHalo),
+                    textHaloWidth(1.5f),
                     textAllowOverlap(true),
                     textIgnorePlacement(true),
                 ),

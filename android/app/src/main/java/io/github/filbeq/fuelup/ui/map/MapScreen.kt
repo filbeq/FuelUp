@@ -183,9 +183,7 @@ fun MapScreen(
                 onCameraIdle = onCameraChange,
                 stationsGeoJson = state.stationsGeoJson,
                 stationColors = StationColors(
-                    clusterFill = MaterialTheme.colorScheme.secondaryContainer.toArgb(),
-                    clusterText = MaterialTheme.colorScheme.onSecondaryContainer.toArgb(),
-                    stroke = MaterialTheme.colorScheme.surface.toArgb(),
+                    cluster = MaterialTheme.colorScheme.primary.toArgb(),
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                     labelText = MaterialTheme.colorScheme.onSurface.toArgb(),
                     labelHalo = MaterialTheme.colorScheme.surface.toArgb(),
