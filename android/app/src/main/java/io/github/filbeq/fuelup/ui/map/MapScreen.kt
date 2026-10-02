@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
+import io.github.filbeq.fuelup.data.isDark
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.LabelLanguage
 import io.github.filbeq.fuelup.map.MapCamera
@@ -57,6 +58,8 @@ import io.github.filbeq.fuelup.map.MapLabels
 import io.github.filbeq.fuelup.map.MapLibreMap
 import io.github.filbeq.fuelup.map.StationColors
 import io.github.filbeq.fuelup.map.styleUrl
+import io.github.filbeq.fuelup.ui.theme.ClusterColorDark
+import io.github.filbeq.fuelup.ui.theme.ClusterColorLight
 import io.github.filbeq.fuelup.ui.station.StationDetails
 import io.github.filbeq.fuelup.ui.station.StationSheetBody
 import io.github.filbeq.fuelup.ui.station.StationSheetHeader
@@ -183,7 +186,8 @@ fun MapScreen(
                 onCameraIdle = onCameraChange,
                 stationsGeoJson = state.stationsGeoJson,
                 stationColors = StationColors(
-                    cluster = MaterialTheme.colorScheme.primary.toArgb(),
+                    // Clusters contrast with the map itself: dark on the light map, pale on the dark one.
+                    cluster = (if (mapStyle.isDark(darkTheme = isSystemInDarkTheme())) ClusterColorDark else ClusterColorLight).toArgb(),
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                     labelText = MaterialTheme.colorScheme.onSurface.toArgb(),
                     labelHalo = MaterialTheme.colorScheme.surface.toArgb(),

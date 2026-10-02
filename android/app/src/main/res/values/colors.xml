@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Keep in sync with ui/theme/Color.kt -->
-    <color name="fuelup_green">#FF0B6E4F</color>
-    <color name="window_background">#FFF5FBF5</color>
+    <!-- Keep in sync with ui/theme/Color.kt (palette "Ink blue"). -->
+    <color name="brand">#FF2F5DA8</color>
+    <color name="window_background">#FFFAF9FD</color>
 </resources>
