@@ -43,3 +43,34 @@ class AppSettingsStore(private val prefs: SharedPreferences) {
         private const val KEY_MAP_STYLE = "mapStyle"
     }
 }
+
+// Settings show each choice as two switches: "follow automatically" and, when
+// that is off, "dark". These map the switches to the stored values.
+
+/** "Follow system theme" switched on/off. Turning it off keeps what's on screen now. */
+fun themeForFollowSystem(follow: Boolean, currentlyDark: Boolean): ThemeMode = when {
+    follow -> ThemeMode.SYSTEM
+    currentlyDark -> ThemeMode.DARK
+    else -> ThemeMode.LIGHT
+}
+
+/** "Dark theme" switched (only possible when not following the system). */
+fun themeForDark(dark: Boolean): ThemeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT
+
+/** "Automatic map style" switched on/off. Turning it off keeps the current map. */
+fun mapStyleForAutomatic(automatic: Boolean, mapCurrentlyDark: Boolean): MapStyleMode = when {
+    automatic -> MapStyleMode.AUTOMATIC
+    mapCurrentlyDark -> MapStyleMode.DARK
+    else -> MapStyleMode.LIGHT
+}
+
+/** "Dark map" switched (only possible when the map style isn't automatic). */
+fun mapStyleForDark(dark: Boolean): MapStyleMode = if (dark) MapStyleMode.DARK else MapStyleMode.LIGHT
+
+/** Whether the map currently uses its dark style. */
+fun MapStyleMode.isDark(darkTheme: Boolean): Boolean = when (this) {
+    MapStyleMode.AUTOMATIC -> darkTheme
+    MapStyleMode.LIGHT -> false
+    MapStyleMode.DARK -> true
+}
+

@@ -86,13 +86,12 @@
     <!-- Impostazioni -->
     <string name="settings_title">Impostazioni</string>
     <string name="settings_theme">Tema</string>
-    <string name="theme_system">Predefinito di sistema</string>
-    <string name="theme_light">Chiaro</string>
-    <string name="theme_dark">Scuro</string>
+    <string name="settings_follow_system_theme">Segui il tema di sistema</string>
+    <string name="settings_dark_theme">Tema scuro</string>
+    <string name="settings_automatic_map_style">Stile mappa automatico</string>
+    <string name="settings_automatic_map_style_detail">Mappa scura con il tema scuro</string>
+    <string name="settings_dark_map">Mappa scura</string>
     <string name="settings_map_style">Stile della mappa</string>
-    <string name="map_style_automatic">Automatico (segue il tema)</string>
-    <string name="map_style_light">Chiaro</string>
-    <string name="map_style_dark">Scuro</string>
     <string name="settings_language">Lingua</string>
     <string name="language_system">Predefinita di sistema</string>
 </resources>
