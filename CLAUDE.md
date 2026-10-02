@@ -199,8 +199,8 @@ small enough to be tested on a real phone before moving on.
   (OpenFreeMap, © OpenMapTiles) always visible in a corner of the map (OSMF
   guidelines), and listed with links in the About screen. MapLibre's own
   attribution button and logo are disabled to avoid duplicates.
-- MapLibre's library manifest declares location permissions: they are removed
-  in our manifest (`tools:node="remove"`) until the "near me" step.
+- MapLibre's library manifest also declares `ACCESS_WIFI_STATE`: removed in
+  our manifest (`tools:node="remove"`).
 - No API keys or secrets are needed by the app.
 - Data: download the published JSON at most once a day, cache it on device,
   work offline from cache, show the data date and a clear error state.
@@ -232,9 +232,34 @@ small enough to be tested on a real phone before moving on.
     station names/addresses stay as provided by MIMIT
 - Language: the in-app setting works on every Android version (AppCompat);
   on Android 13+ it is the same setting as the system per-app language picker.
-- Location permission: request only when the user taps "near me"; the app
-  must work without it. Re-add the location permissions removed from
-  MapLibre's manifest at that step.
+- "Near me" (step 7):
+  - Permission: asked only when the my-location button (bottom right of the
+    map, lifted above the sheet) is tapped; foreground only, never
+    background. Approximate and precise are requested together: on Android
+    12+ the user picks (approximate is enough). Approximate-only was tried
+    first, but on Android ≤ 11 such apps can't use GPS and the network source
+    alone stayed silent on the test phone.
+  - The app works fully without it. Refused, refused for good (button to the
+    app's settings page), location off (button to location settings) and
+    "no position" each get a localized explanation in the sheet.
+  - Position: one fix per tap (no tracking), platform `LocationManager` (no
+    Google Play services), racing fused/network/GPS (GPS only if precise is
+    allowed), 20 s timeout, recent last-known fix used first. Kept in memory
+    only; never saved or sent.
+  - Drawn honestly: a translucent disc of the reported accuracy plus a small
+    centre mark (no precise-looking dot); the search radius as a dashed
+    circle; the camera fits it between the top controls and the sheet.
+  - List in the station sheet when no station is selected: radius chips
+    5/10/20 km (default 10 km: median ~40 stations, ≥ 3 in 99% of places,
+    measured), sort Price (default; "to verify" last) / Distance, both saved.
+    Rows: class icon and words, price, brand, distance as the crow flies
+    (whole km when the fix is worse than 500 m), motorway badge, report age.
+    A row selects the station and shows it; Back returns to the list.
+  - Play Store: no background-location declaration needed; location never
+    leaves the phone, so the Data safety form declares nothing collected.
+    A privacy policy URL is still required for every app.
+- Cluster "from" prices exclude prices "to verify" and duty-free Livigno
+  (`StationLayers.fromPrice`).
 - No analytics, no tracking, no personal data collected.
 
 ## Roadmap (MVP first, one step at a time)
@@ -253,7 +278,8 @@ small enough to be tested on a real phone before moving on.
    clusters sized by count, "Ink blue" palette (no green/orange/red in the UI).
 6d. Map fixes: drop stations placed in another province (pipeline), link
    stations at the same spot, cluster count + "from" price pill.
-7. "Near me" with location permission.
+7. "Near me" with location permission: my-location button, accuracy disc,
+   cheapest-nearby list (5/10/20 km, price/distance).
 8. Later: favorites, search, price history, UI polish, Play Store prep.
    Note: the map view is rebuilt (~1 s style reload) when returning from
    another screen. Before adding frequently used screens (favorites, search),

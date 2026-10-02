@@ -152,6 +152,13 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/station/StationDetails.kt` | Station + prices per fuel, from the cached data (pure Kotlin) |
 | `java/…/ui/station/PriceFormat.kt` | Price numbers and "days since reported" |
 | `java/…/ui/station/StationSheet.kt` | Station sheet content and the Navigate (`geo:`) intent |
+| `java/…/data/UserLocation.kt` | One position on request (LocationManager, no Google services) |
+| `java/…/data/Geo.kt` | Distances and circles as the crow flies |
+| `java/…/data/Nearby.kt` | "Near me" list: stations within a radius, sorted; saved radius/sort |
+| `java/…/ui/map/NearMeViewModel.kt` | "Near me" state: permission answers, position, radius/sort |
+| `java/…/ui/map/NearMePanel.kt` | Sheet messages while locating, or why there is no position |
+| `java/…/ui/map/NearbyList.kt` | The "near me" list in the sheet |
+| `java/…/map/UserLocationLayers.kt` | Accuracy disc and search circle on the map |
 | `java/…/ui/about/AboutScreen.kt` | Data source, notices, map credits |
 | `java/…/ui/theme/` | Fixed FuelUp light/dark palette |
 | `res/values/strings.xml`, `res/values-it/strings.xml` | English and Italian text |

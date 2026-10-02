@@ -14,7 +14,9 @@ station in Italy on the map (grouped when zoomed out) and works offline with
 the last downloaded data. Pick your fuel (and self or served) and each station
 is marked cheap, average or expensive compared with the stations around it, with
 prices shown on the map. Tap a station to see all its prices, when each was last
-reported, and to start navigation in your favourite maps app. In Settings you
+reported, and to start navigation in your favourite maps app. Tap the
+location button to see the cheapest (or nearest) stations within 5, 10 or 20 km
+of you. In Settings you
 can choose a light or dark theme and map, and the language (Italiano or
 English).
 
@@ -23,7 +25,6 @@ Planned features:
 - every station in Italy on the map, with its prices
 - prices per fuel (petrol, diesel, LPG, methane, …), self-service and served
 - colours from cheapest to most expensive for the fuel you choose
-- stations near you (location is used only when you ask)
 - works offline with the last downloaded prices
 - English and Italian
 
@@ -38,6 +39,11 @@ reported by the stations to the Ministry. The data is updated once a day and is
 FuelUp has no accounts, no ads, no analytics and no tracking. It collects no
 personal data. It downloads the daily price file and the map tiles; nothing
 else leaves your phone.
+
+Your location is used only when you tap the location button, only while the
+app is open, and only on your phone: it is never saved or sent anywhere.
+Approximate location is enough (on Android 12 and newer you can choose it in
+the permission dialog). Without the permission, everything else works.
 
 ## Credits
 
