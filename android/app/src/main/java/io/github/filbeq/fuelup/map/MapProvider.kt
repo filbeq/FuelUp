@@ -18,7 +18,9 @@ data class MapProvider(
 /** OpenFreeMap: free vector tiles from OpenStreetMap data, no API key needed. */
 val OpenFreeMap = MapProvider(
     lightStyleUrl = "https://tiles.openfreemap.org/styles/liberty",
-    darkStyleUrl = "https://tiles.openfreemap.org/styles/dark",
+    // "fiord" (dark blue-grey) rather than "dark": clearly more readable on a phone
+    // at night (compared on a Redmi Note 9 Pro, October 2026).
+    darkStyleUrl = "https://tiles.openfreemap.org/styles/fiord",
     labelFont = "Noto Sans Bold",
     attributions = listOf(
         MapAttribution(R.string.attribution_openfreemap, "https://openfreemap.org"),
