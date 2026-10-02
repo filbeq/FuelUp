@@ -1,13 +1,18 @@
 package io.github.filbeq.fuelup.map
 
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
+import androidx.core.graphics.createBitmap
 import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.data.PriceClass
 import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.Station
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.ImageContent
+import org.maplibre.android.maps.ImageStretches
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -27,6 +32,7 @@ import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.min
 import org.maplibre.android.style.expressions.Expression.not
 import org.maplibre.android.style.expressions.Expression.numberFormat
+import org.maplibre.android.style.expressions.Expression.product
 import org.maplibre.android.style.expressions.Expression.step
 import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.expressions.Expression.switchCase
@@ -40,6 +46,9 @@ import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconSize
+import org.maplibre.android.style.layers.PropertyFactory.iconTextFit
+import org.maplibre.android.style.layers.PropertyFactory.symbolSortKey
 import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.textAnchor
 import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
@@ -69,21 +78,34 @@ data class MapLabels(val localeTag: String, val clusterPricePrefix: String, val 
  * colour. Station markers use [StationIcons].
  */
 data class StationColors(
-    /** Cluster outline; also its fill, at [StationLayers.CLUSTER_FILL_OPACITY]. */
+    /** Cluster outline (also the price pill's); also its fill, at [StationLayers.CLUSTER_FILL_OPACITY]. */
     val cluster: Int,
     val selected: Int,
     val labelText: Int,
+    /** Halo around map labels; also the background of the cluster price pill. */
     val labelHalo: Int,
 )
 
 /**
  * Stations on the map, grouped by MapLibre's built-in GeoJSON clustering:
- * one source and three layers (cluster circles, cluster counts, single stations).
+ * one source, and layers for clusters (circle with the station count, "from"
+ * price pill underneath) and single stations (icon, price, selection ring).
  */
 object StationLayers {
     private const val SOURCE_ID = "fuelup-stations"
     private const val CLUSTER_LAYER_ID = "fuelup-clusters"
     private const val COUNT_LAYER_ID = "fuelup-cluster-count"
+    private const val PILL_LAYER_ID = "fuelup-cluster-price"
+    private const val PILL_IMAGE = "fuelup-pill"
+    private const val AREA_IMAGE = "fuelup-cluster-area"
+    /** Side of [AREA_IMAGE] in dp, scaled per cluster size with `icon-size`. */
+    private const val AREA_SIZE_DP = 10f
+    /**
+     * Share of a circle's diameter kept free of other clusters' pills. The whole
+     * circle hid most prices at national zoom; 60% keeps pills off the counts
+     * and lets them touch only a neighbour's rim.
+     */
+    private const val AREA_SHARE = 0.6f
     private const val PRICE_LAYER_ID = "fuelup-station-price"
     private const val STATION_LAYER_ID = "fuelup-station"
     private const val SELECTED_LAYER_ID = "fuelup-selected"
@@ -113,6 +135,11 @@ object StationLayers {
 
     /** Translucent fill so the map stays visible; the outline stays solid. */
     const val CLUSTER_FILL_OPACITY = 0.3f
+    private const val CLUSTER_STROKE_DP = 2f
+
+    private const val PILL_TEXT_SP = 11f
+    /** Space between a cluster circle's outline and its price pill (dp). */
+    private const val PILL_GAP_DP = 3f
 
     private const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
@@ -166,42 +193,57 @@ object StationLayers {
                 .withProperties(
                     circleColor(colors.cluster),
                     circleOpacity(CLUSTER_FILL_OPACITY),
-                    circleRadius(
-                        step(
-                            get("point_count"),
-                            literal(CLUSTER_SMALLEST),
-                            *CLUSTER_SIZES.map { (count, radius) -> stop(count, radius) }.toTypedArray(),
-                        ),
-                    ),
+                    circleRadius(clusterStep(literal(CLUSTER_SMALLEST)) { literal(it) }),
                     circleStrokeColor(colors.cluster),
-                    circleStrokeWidth(2f),
+                    circleStrokeWidth(CLUSTER_STROKE_DP),
                 ),
         )
+        // "da 1,990" in a pill under the circle, only where there is room. Added
+        // below the counts: MapLibre places the upper layer first, so pills give
+        // way to the circles (see the count layer) as well as to each other.
+        style.addPillImage(PILL_IMAGE, colors, density)
+        style.addLayer(
+            SymbolLayer(PILL_LAYER_ID, SOURCE_ID)
+                // No pill if every price in the cluster is to verify.
+                .withFilter(all(has("point_count"), lt(get(MIN_PRICE_PROPERTY), literal(NO_PRICE))))
+                .withProperties(
+                    textField(
+                        concat(
+                            literal(labels.clusterPricePrefix),
+                            priceText(get(MIN_PRICE_PROPERTY), labels.localeTag),
+                            literal(labels.clusterPriceSuffix),
+                        ),
+                    ),
+                    textFont(arrayOf(font)),
+                    textSize(PILL_TEXT_SP),
+                    textColor(colors.labelText),
+                    // Top of the text just under the circle (offset in ems, by circle size).
+                    textAnchor(Property.TEXT_ANCHOR_TOP),
+                    textOffset(clusterStep(pillOffset(CLUSTER_SMALLEST)) { pillOffset(it) }),
+                    iconImage(PILL_IMAGE),
+                    iconTextFit(Property.ICON_TEXT_FIT_BOTH),
+                    // When pills compete for room, bigger groups win.
+                    symbolSortKey(product(literal(-1), get("point_count"))),
+                ),
+        )
+        // Station count inside the circle ("1.234" / "1,234"): always shown. Its
+        // invisible icon, a square over most of the circle, makes MapLibre keep
+        // pills off circles (circle layers don't take part in label placement).
+        style.addImage(AREA_IMAGE, createBitmap((AREA_SIZE_DP * density).toInt(), (AREA_SIZE_DP * density).toInt()))
         style.addLayer(
             SymbolLayer(COUNT_LAYER_ID, SOURCE_ID)
                 .withFilter(has("point_count"))
                 .withProperties(
-                    // "da 1,990"; the station count if every price in it is to verify.
-                    textField(
-                        switchCase(
-                            lt(get(MIN_PRICE_PROPERTY), literal(NO_PRICE)),
-                            concat(
-                                literal(labels.clusterPricePrefix),
-                                priceText(get(MIN_PRICE_PROPERTY), labels.localeTag),
-                                literal(labels.clusterPriceSuffix),
-                            ),
-                            get("point_count_abbreviated"),
-                        ),
-                    ),
+                    iconImage(AREA_IMAGE),
+                    iconSize(clusterStep(areaScale(CLUSTER_SMALLEST)) { areaScale(it) }),
+                    iconAllowOverlap(true),
+                    textField(numberFormat(get("point_count"), locale(labels.localeTag))),
                     textFont(arrayOf(font)),
                     textSize(11f),
-                    // On small circles the text is wider than the circle: the halo
-                    // keeps it readable over the map.
                     textColor(colors.labelText),
                     textHaloColor(colors.labelHalo),
                     textHaloWidth(1.5f),
                     textAllowOverlap(true),
-                    textIgnorePlacement(true),
                 ),
         )
         // Single stations: one icon per price class (colour + shape, see StationIcons).
@@ -250,6 +292,58 @@ object StationLayers {
         )
     }
 
+    /** A value per cluster size: [smallest] below the first [CLUSTER_SIZES] step, then [byRadius] of each radius. */
+    private fun clusterStep(smallest: Expression, byRadius: (Float) -> Expression) = step(
+        get("point_count"),
+        smallest,
+        *CLUSTER_SIZES.map { (count, radius) -> stop(count, byRadius(radius)) }.toTypedArray(),
+    )
+
+    /** `icon-size` that makes [AREA_IMAGE] cover [AREA_SHARE] of a circle of [radius] dp. */
+    private fun areaScale(radius: Float) = literal(AREA_SHARE * 2 * radius / AREA_SIZE_DP)
+
+    /** Text offset (ems) that puts a pill [PILL_GAP_DP] under a circle of [radius] dp. */
+    private fun pillOffset(radius: Float) =
+        literal(arrayOf(0f, (radius + CLUSTER_STROKE_DP / 2 + PILL_GAP_DP + PILL_PADDING_Y_DP) / PILL_TEXT_SP))
+
+    private const val PILL_PADDING_X_DP = 6f
+    private const val PILL_PADDING_Y_DP = 2f
+
+    /**
+     * Adds the pill background, stretched by MapLibre to fit each label
+     * (`icon-text-fit`): surface colour with a thin outline in the cluster
+     * colour. Only the straight middle stretches, so the ends stay round.
+     */
+    private fun Style.addPillImage(name: String, colors: StationColors, density: Float) {
+        val corner = 8f * density
+        val stroke = 1.5f * density
+        val width = (2 * corner + 4 * density).toInt()
+        val height = (2 * corner).toInt() + 2
+        val bitmap = createBitmap(width, height)
+        val rect = RectF(stroke / 2, stroke / 2, width - stroke / 2, height - stroke / 2)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val canvas = Canvas(bitmap)
+        paint.color = colors.labelHalo
+        canvas.drawRoundRect(rect, corner, corner, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = stroke
+        paint.color = colors.cluster
+        canvas.drawRoundRect(rect, corner, corner, paint)
+        addImage(
+            name,
+            bitmap,
+            listOf(ImageStretches(corner, width - corner)),
+            listOf(ImageStretches(corner, height - corner)),
+            // Where the text goes: the rest is padding.
+            ImageContent(
+                PILL_PADDING_X_DP * density,
+                PILL_PADDING_Y_DP * density,
+                width - PILL_PADDING_X_DP * density,
+                height - PILL_PADDING_Y_DP * density,
+            ),
+        )
+    }
+
     /** A price in thousandths of a euro as "1,990" / "1.990" for [localeTag]. */
     private fun priceText(milli: Expression, localeTag: String) = numberFormat(
         division(milli, literal(1000)),
@@ -268,7 +362,7 @@ object StationLayers {
 
     /**
      * Handles a tap at [point] (screen pixels): a station → [onStationClick] with its
-     * id; a cluster → zoom in until it splits. Returns false if nothing was hit.
+     * id; a cluster (circle or price pill) → zoom in until it splits. Returns false if nothing was hit.
      */
     fun handleTap(map: MapLibreMap, style: Style, point: PointF, density: Float, onStationClick: (Int) -> Unit): Boolean {
         val slop = TAP_SLOP_DP * density
@@ -279,7 +373,7 @@ object StationLayers {
             onStationClick(id)
             return true
         }
-        map.queryRenderedFeatures(box, CLUSTER_LAYER_ID).nearestTo(map, point)?.let { cluster ->
+        map.queryRenderedFeatures(box, CLUSTER_LAYER_ID, PILL_LAYER_ID).nearestTo(map, point)?.let { cluster ->
             val source = style.getSourceAs<GeoJsonSource>(SOURCE_ID) ?: return false
             val zoom = source.getClusterExpansionZoom(cluster).toDouble()
             val center = (cluster.geometry() as? Point)?.let { LatLng(it.latitude(), it.longitude()) } ?: return false
