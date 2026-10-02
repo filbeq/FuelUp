@@ -35,6 +35,7 @@ class StationGeoJsonTest {
         assertEquals("2049", properties["p"]!!.jsonPrimitive.content) // Benzina self
         // Only two petrol stations in the fixture: too few neighbours to compare.
         assertEquals("NOT_COMPARED", properties["c"]!!.jsonPrimitive.content)
+        assertEquals("2049", properties["fp"]!!.jsonPrimitive.content)
         // GeoJSON order is [longitude, latitude].
         assertEquals(listOf("11.57083", "44.88012"), geometry["coordinates"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
@@ -42,5 +43,15 @@ class StationGeoJsonTest {
     @Test
     fun emptyList() {
         assertEquals("""{"type":"FeatureCollection","features":[]}""", StationLayers.buildGeoJson(emptyList<Station>(), emptyMap()))
+    }
+
+    @Test
+    fun toVerifyAndDutyFreePricesNeverBecomeClusterFromPrices() {
+        fun ranked(group: CompareGroup, priceClass: PriceClass) = RankedPrice(1500, 0, group, priceClass, null)
+        assertEquals(1500L, StationLayers.fromPrice(ranked(CompareGroup.ROAD, PriceClass.CHEAP)))
+        assertEquals(1500L, StationLayers.fromPrice(ranked(CompareGroup.MOTORWAY, PriceClass.AVERAGE)))
+        val none = StationLayers.NO_PRICE.toLong()
+        assertEquals(none, StationLayers.fromPrice(ranked(CompareGroup.ROAD, PriceClass.TO_VERIFY)))
+        assertEquals(none, StationLayers.fromPrice(ranked(CompareGroup.DUTY_FREE, PriceClass.CHEAP)))
     }
 }

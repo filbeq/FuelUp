@@ -6,6 +6,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import androidx.core.graphics.createBitmap
 import io.github.filbeq.fuelup.PerfLog
+import io.github.filbeq.fuelup.data.CompareGroup
 import io.github.filbeq.fuelup.data.PriceClass
 import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.Station
@@ -112,10 +113,12 @@ object StationLayers {
     private const val ID_PROPERTY = "id"
     private const val CLASS_PROPERTY = "c"
     private const val PRICE_PROPERTY = "p"
-    /** Cluster property: cheapest price in the group, ignoring prices "to verify". */
+    /** The station's price as a candidate for its cluster's "from" price (see [fromPrice]). */
+    private const val FROM_PRICE_PROPERTY = "fp"
+    /** Cluster property: the cheapest [FROM_PRICE_PROPERTY] in the group. */
     private const val MIN_PRICE_PROPERTY = "minPrice"
-    /** Stands in for "no usable price" (all stations in the cluster to verify). */
-    private const val NO_PRICE = 1_000_000
+    /** Stands in for "no usable price" (e.g. every station in the cluster to verify). */
+    const val NO_PRICE = 1_000_000
     private const val NO_STATION = -1
 
     /** Taps this close to a marker count as a tap on it (markers are only 6 dp). */
@@ -147,7 +150,7 @@ object StationLayers {
      * GeoJSON with one point per station that sells the chosen fuel (the
      * stations missing from [ranked]). Properties: the station id as a number
      * (MapLibre returns feature ids as text, so tap handling reads this), `p` =
-     * price in thousandths of a euro, `c` = [PriceClass] name.
+     * price in thousandths of a euro, `c` = [PriceClass] name, `fp` = [fromPrice].
      * Built as a string: MapLibre parses it natively, without creating ~21k
      * Java objects.
      */
@@ -164,10 +167,22 @@ object StationLayers {
                 append(station.lon).append(',').append(station.lat)
                 append("""]},"properties":{"id":""").append(station.id)
                 append(""","p":""").append(price.priceMilli)
+                append(""","fp":""").append(fromPrice(price))
                 append(""","c":"""").append(price.priceClass.name).append("\"}}")
             }
             append("]}")
         }
+
+    /**
+     * What a station contributes to its cluster's "from" price: its price, or
+     * [NO_PRICE] if it is to verify (possibly an error) or duty-free (Livigno:
+     * a price nobody outside it can get).
+     */
+    fun fromPrice(price: RankedPrice): Long = when {
+        price.priceClass == PriceClass.TO_VERIFY -> NO_PRICE.toLong()
+        price.group == CompareGroup.DUTY_FREE -> NO_PRICE.toLong()
+        else -> price.priceMilli
+    }
 
     /** Adds the source and layers to a freshly loaded style (initially empty). */
     fun addTo(style: Style, colors: StationColors, font: String, density: Float, labels: MapLabels) {
@@ -175,16 +190,8 @@ object StationLayers {
             .withCluster(true)
             .withClusterMaxZoom(CLUSTER_MAX_ZOOM)
             .withClusterRadius(CLUSTER_RADIUS)
-            // Each cluster carries its cheapest price; flagged prices don't count.
-            .withClusterProperty(
-                MIN_PRICE_PROPERTY,
-                min(accumulated(), get(MIN_PRICE_PROPERTY)),
-                switchCase(
-                    eq(get(CLASS_PROPERTY), literal(PriceClass.TO_VERIFY.name)),
-                    literal(NO_PRICE),
-                    get(PRICE_PROPERTY),
-                ),
-            )
+            // Each cluster carries its cheapest price (see fromPrice).
+            .withClusterProperty(MIN_PRICE_PROPERTY, min(accumulated(), get(MIN_PRICE_PROPERTY)), get(FROM_PRICE_PROPERTY))
         style.addSource(GeoJsonSource(SOURCE_ID, EMPTY, options))
 
         style.addLayer(
