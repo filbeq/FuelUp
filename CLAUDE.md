@@ -146,8 +146,8 @@ small enough to be tested on a real phone before moving on.
 - Colour-blind safety: every class has a distinct marker shape and the sheet
   says it in words; colour is never the only signal.
 - Debug builds are arm64-only to keep installs small; release keeps all ABIs.
-- Theme: fixed FuelUp light/dark palette (follows the system dark setting);
-  no dynamic colour.
+- Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
+  (system default unless chosen in Settings); no dynamic colour.
 - Maps: MapLibre Native for Android (`org.maplibre.gl:android-sdk`) wrapped in
   Compose with `AndroidView` around `MapView`, kept in a single file. Chosen
   over the `maplibre-compose` wrapper, which is pre-1.0 with frequent breaking
