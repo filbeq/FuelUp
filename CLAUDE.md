@@ -115,10 +115,21 @@ small enough to be tested on a real phone before moving on.
   Compose compiler plugin matching the Kotlin version, version catalog in
   `gradle/libs.versions.toml`. minSdk 26, targetSdk 36, compileSdk 37 (required
   by current AndroidX). Open/build the `android/` folder, not the repo root.
-- Navigation: no navigation library yet. Two places (map, About) plus a
-  station sheet that is part of the map screen, driven by saved state in
-  `FuelUpApp` and system Back. Revisit when real screens are added (step 8:
-  favorites, search, settings), deep links, or a deeper back stack.
+- Navigation (step 6b): Navigation 3 (`androidx.navigation3`). The back stack
+  is a saved list of `@Serializable` screens (`MapRoute`, `SettingsRoute`,
+  `AboutRoute`) in `ui/FuelUpApp.kt`; system Back pops it. The map's ViewModel,
+  camera and selected station live above the navigation, so they survive other
+  screens. The station sheet is part of the map screen and gets Back first.
+- Settings (step 6b): gear icon top right → Settings (theme system/light/dark,
+  map style automatic/light/dark, language system/Italiano/English) → About.
+  Theme and map style saved in SharedPreferences (`AppSettingsStore`, same file
+  as the fuel choice); the saved theme is applied before the first frame.
+- AppCompat (step 6b): `MainActivity` is an `AppCompatActivity` with an
+  AppCompat DayNight window theme, so `AppCompatDelegate` can switch the app
+  language (`setApplicationLocales`, stored by AppCompat's
+  `AppLocalesMetadataHolderService` on Android < 13 and by the system on 13+,
+  in sync with the system per-app picker) and light/dark
+  (`setDefaultNightMode`). Compose and Material 3 are unaffected.
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
@@ -141,7 +152,9 @@ small enough to be tested on a real phone before moving on.
   Compose with `AndroidView` around `MapView`, kept in a single file. Chosen
   over the `maplibre-compose` wrapper, which is pre-1.0 with frequent breaking
   releases; reconsider once it reaches 1.0.
-- Tiles: OpenFreeMap vector styles (`liberty` light, `dark` dark), no API key.
+- Tiles: OpenFreeMap vector styles (`liberty` light, `fiord` dark), no API key.
+  `fiord` replaced `dark` (too hard to read on a phone) after comparing all five
+  OpenFreeMap styles in the dark app theme (liberty, bright, positron, dark, fiord).
   Style URLs and attribution live in one place (`map/MapProvider.kt`,
   `CurrentMapProvider`) so the provider (e.g. MapTiler) can be swapped by
   changing a single constant. A provider that needs a key must keep it out of git.
@@ -183,8 +196,8 @@ small enough to be tested on a real phone before moving on.
     (e.g. `1,849 €/l` vs `€1.849/l`, and `1,794 €/kg` for methane)
   - fuel type labels come from string resources keyed by the enum;
     station names/addresses stay as provided by MIMIT
-- Per-app language picker only exists on Android 13+; on older Android the
-  app follows the system language (an in-app picker may come with UI polish).
+- Language: the in-app setting works on every Android version (AppCompat);
+  on Android 13+ it is the same setting as the system per-app language picker.
 - Location permission: request only when the user taps "near me"; the app
   must work without it. Re-add the location permissions removed from
   MapLibre's manifest at that step.
@@ -200,7 +213,12 @@ small enough to be tested on a real phone before moving on.
    to the local name (`name`).
 5. Station detail: prices per fuel, self/served, last update date.
 6. Fuel filter + marker colors by relative price (cheap → expensive).
+6b. Settings screen (theme, map style, language incl. Android < 13) and a
+   readable dark map style (fiord); Navigation 3 for map, settings and About.
 7. "Near me" with location permission.
 8. Later: favorites, search, price history, UI polish, Play Store prep.
+   Note: the map view is rebuilt (~1 s style reload) when returning from
+   another screen. Before adding frequently used screens (favorites, search),
+   find a way to keep the map alive.
 
 Finish each step with a working build and a commit before starting the next.

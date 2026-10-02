@@ -121,16 +121,19 @@ If `adb devices` shows nothing although the cable is connected: unlock the
 phone, look for the "Allow USB debugging?" prompt, or turn USB debugging off
 and on again.
 
-**Testing languages:** on Android 13+ use Settings → Apps → FuelUp → Language.
-Older Android versions have no per-app language setting: change the phone's
-language instead.
+**Testing languages:** in the app, gear icon → Settings → Language (works on
+every Android version). On Android 13+ the same choice also appears in the
+system's Settings → Apps → FuelUp → Language.
 
 ### Code map
 
 | Path (under `android/app/src/main/`) | What it does |
 |---|---|
 | `java/…/MainActivity.kt` | Entry point: initialises MapLibre, sets the theme |
-| `java/…/ui/FuelUpApp.kt` | Switches between the map and About; keeps the camera and the selected station (no navigation library, see CLAUDE.md) |
+| `java/…/ui/FuelUpApp.kt` | Screens and back stack (Navigation 3: map, settings, About); keeps the camera and the selected station |
+| `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices; link to About |
+| `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
+| `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
 | `java/…/ui/map/MapScreen.kt` | Top bar, map, station sheet (non-modal), credits that follow the sheet |
 | `java/…/map/MapLibreMap.kt` | MapLibre `MapView` inside Compose (all MapLibre glue) |
 | `java/…/map/MapProvider.kt` | Map style URLs and credits: change `CurrentMapProvider` to switch provider |

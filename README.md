@@ -14,7 +14,9 @@ station in Italy on the map (grouped when zoomed out) and works offline with
 the last downloaded data. Pick your fuel (and self or served) and each station
 is marked cheap, average or expensive compared with the stations around it, with
 prices shown on the map. Tap a station to see all its prices, when each was last
-reported, and to start navigation in your favourite maps app.
+reported, and to start navigation in your favourite maps app. In Settings you
+can choose a light or dark theme and map, and the language (Italiano or
+English).
 
 Planned features:
 
