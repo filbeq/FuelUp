@@ -1,39 +1,46 @@
 package io.github.filbeq.fuelup.map
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import androidx.core.graphics.createBitmap
 import io.github.filbeq.fuelup.data.Geo
 import io.github.filbeq.fuelup.data.UserPosition
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
-import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
-import org.maplibre.android.style.layers.PropertyFactory.circleColor
-import org.maplibre.android.style.layers.PropertyFactory.circleRadius
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
-import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
+import kotlin.math.roundToInt
 
 /**
  * The user's position and the "near me" search radius. The position is drawn
  * honestly: a translucent disc as big as the reported accuracy (with
  * approximate location, ~1–2 km across), plus a small centre mark, never a
- * precise-looking dot. Added before [StationLayers], so it lies under the
- * stations and never blocks a tap on them.
+ * precise-looking dot. The disc and the circle are added before
+ * [StationLayers] ([addBelowStations]), so they lie under the stations; only the
+ * small centre mark goes on top ([addAboveStations]), since a nearby cluster
+ * would otherwise cover exactly where you are. Taps still reach the stations.
  */
 object UserLocationLayers {
     private const val SOURCE_ID = "fuelup-user"
     private const val ACCURACY_FILL_ID = "fuelup-user-accuracy"
+    private const val ACCURACY_HALO_ID = "fuelup-user-accuracy-halo"
     private const val ACCURACY_LINE_ID = "fuelup-user-accuracy-line"
+    private const val RADIUS_HALO_ID = "fuelup-user-radius-halo"
     private const val RADIUS_LINE_ID = "fuelup-user-radius"
     private const val CENTRE_ID = "fuelup-user-centre"
+    private const val CENTRE_IMAGE = "fuelup-user-centre"
     private const val KIND = "k"
     private const val ACCURACY = "accuracy"
     private const val RADIUS = "radius"
@@ -41,28 +48,54 @@ object UserLocationLayers {
 
     private const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
-    fun addTo(style: Style, color: Int) {
+    /**
+     * [color] draws the position and the circle; [halo] (white on a light map,
+     * near-black on a dark one) goes under every line so it stands out over
+     * roads, water and parks.
+     */
+    fun addBelowStations(style: Style, color: Int, halo: Int) {
         style.addSource(GeoJsonSource(SOURCE_ID, EMPTY))
-        style.addLayer(
-            FillLayer(ACCURACY_FILL_ID, SOURCE_ID)
-                .withFilter(eq(get(KIND), literal(ACCURACY)))
-                .withProperties(fillColor(color), fillOpacity(0.18f)),
-        )
-        style.addLayer(
-            LineLayer(ACCURACY_LINE_ID, SOURCE_ID)
-                .withFilter(eq(get(KIND), literal(ACCURACY)))
-                .withProperties(lineColor(color), lineWidth(1f), lineOpacity(0.6f)),
-        )
+        val accuracy = eq(get(KIND), literal(ACCURACY))
+        val radius = eq(get(KIND), literal(RADIUS))
+        style.addLayer(FillLayer(ACCURACY_FILL_ID, SOURCE_ID).withFilter(accuracy).withProperties(fillColor(color), fillOpacity(0.2f)))
+        style.addLayer(LineLayer(ACCURACY_HALO_ID, SOURCE_ID).withFilter(accuracy).withProperties(lineColor(halo), lineWidth(4f)))
+        style.addLayer(LineLayer(ACCURACY_LINE_ID, SOURCE_ID).withFilter(accuracy).withProperties(lineColor(color), lineWidth(2f)))
+        style.addLayer(LineLayer(RADIUS_HALO_ID, SOURCE_ID).withFilter(radius).withProperties(lineColor(halo), lineWidth(6f)))
         style.addLayer(
             LineLayer(RADIUS_LINE_ID, SOURCE_ID)
-                .withFilter(eq(get(KIND), literal(RADIUS)))
-                .withProperties(lineColor(color), lineWidth(1.5f), lineOpacity(0.8f), lineDasharray(arrayOf(3f, 2f))),
+                .withFilter(radius)
+                // Dash lengths are in line widths: 3 dp dashes of 9 dp, gaps of 6 dp.
+                .withProperties(lineColor(color), lineWidth(3f), lineDasharray(arrayOf(3f, 2f))),
         )
+    }
+
+    /**
+     * "You are here": small on purpose, so it never looks more precise than the
+     * disc. A symbol rather than a circle, so it takes part in label placement:
+     * a price label or "from" pill that would run into it is left out instead of
+     * being drawn half-covered. Station icons are unaffected.
+     */
+    fun addAboveStations(style: Style, color: Int, halo: Int, density: Float) {
+        style.addImage(CENTRE_IMAGE, centreMark(color, halo, density))
         style.addLayer(
-            CircleLayer(CENTRE_ID, SOURCE_ID)
+            SymbolLayer(CENTRE_ID, SOURCE_ID)
                 .withFilter(eq(get(KIND), literal(CENTRE)))
-                .withProperties(circleRadius(2.5f), circleColor(color), circleStrokeColor(0xFFFFFFFF.toInt()), circleStrokeWidth(1f)),
+                .withProperties(iconImage(CENTRE_IMAGE), iconAllowOverlap(true)),
         )
+    }
+
+    /** A 12 dp dot in [color] with a 2 dp ring in [halo]. */
+    private fun centreMark(color: Int, halo: Int, density: Float): Bitmap {
+        val size = (16 * density).roundToInt()
+        val bitmap = createBitmap(size, size)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val c = size / 2f
+        paint.color = halo
+        canvas.drawCircle(c, c, 8 * density, paint)
+        paint.color = color
+        canvas.drawCircle(c, c, 6 * density, paint)
+        return bitmap
     }
 
     /** Shows [position] (null = nothing) and, if given, the search circle of [radiusKm]. */

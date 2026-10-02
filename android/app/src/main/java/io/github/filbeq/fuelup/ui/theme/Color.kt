@@ -19,6 +19,13 @@ val BrandColor = Color(0xFF2F5DA8)
 val ClusterColorLight = Color(0xFF2F5DA8)
 val ClusterColorDark = Color(0xFFD7E2FF)
 
+// The user's position and the "near me" circle: a more saturated blue than the
+// clusters, chosen by map darkness, each line with a halo in the opposite tone.
+val LocationColorLight = Color(0xFF0B57D0)
+val LocationColorDark = Color(0xFFA8C7FA)
+val LocationHaloLight = Color(0xFFFFFFFF)
+val LocationHaloDark = Color(0xFF14171C)
+
 val LightColors = lightColorScheme(
     primary = Color(0xFF2F5DA8),
     onPrimary = Color(0xFFFFFFFF),

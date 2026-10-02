@@ -77,6 +77,10 @@ import io.github.filbeq.fuelup.ui.station.StationSheetHeader
 import io.github.filbeq.fuelup.ui.station.stationDetails
 import io.github.filbeq.fuelup.ui.theme.ClusterColorDark
 import io.github.filbeq.fuelup.ui.theme.ClusterColorLight
+import io.github.filbeq.fuelup.ui.theme.LocationColorDark
+import io.github.filbeq.fuelup.ui.theme.LocationColorLight
+import io.github.filbeq.fuelup.ui.theme.LocationHaloDark
+import io.github.filbeq.fuelup.ui.theme.LocationHaloLight
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -308,6 +312,7 @@ fun MapScreen(
                     mapHeightPx = it.size.height
                 },
         ) {
+            val mapIsDark = mapStyle.isDark(darkTheme = isSystemInDarkTheme())
             MapLibreMap(
                 styleUrl = provider.styleUrl(mapStyle, darkTheme = isSystemInDarkTheme()),
                 camera = camera,
@@ -315,7 +320,7 @@ fun MapScreen(
                 stationsGeoJson = state.stationsGeoJson,
                 stationColors = StationColors(
                     // Clusters contrast with the map itself: dark on the light map, pale on the dark one.
-                    cluster = (if (mapStyle.isDark(darkTheme = isSystemInDarkTheme())) ClusterColorDark else ClusterColorLight).toArgb(),
+                    cluster = (if (mapIsDark) ClusterColorDark else ClusterColorLight).toArgb(),
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                     labelText = MaterialTheme.colorScheme.onSurface.toArgb(),
                     labelHalo = MaterialTheme.colorScheme.surface.toArgb(),
@@ -327,7 +332,9 @@ fun MapScreen(
                 onStationClick = onStationClick,
                 userPosition = nearMe.position,
                 searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },
-                locationColor = MaterialTheme.colorScheme.primary.toArgb(),
+                // Like the clusters, by the map's darkness (the app theme may differ).
+                locationColor = (if (mapIsDark) LocationColorDark else LocationColorLight).toArgb(),
+                locationHalo = (if (mapIsDark) LocationHaloDark else LocationHaloLight).toArgb(),
                 cameraCommand = cameraCommand,
                 modifier = Modifier.fillMaxSize(),
             )

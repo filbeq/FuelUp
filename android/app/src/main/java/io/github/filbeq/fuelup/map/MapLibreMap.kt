@@ -86,8 +86,9 @@ fun MapLibreMap(
     userPosition: UserPosition?,
     /** "Near me" search circle around [userPosition], or null. */
     searchRadiusKm: Double?,
-    /** Colour (ARGB) of the user's position and the search circle. */
+    /** Colours (ARGB) of the user's position and the search circle, see [UserLocationLayers]. */
     locationColor: Int,
+    locationHalo: Int,
     /** Latest camera move asked for, or null. */
     cameraCommand: CameraCommand?,
     modifier: Modifier = Modifier,
@@ -98,6 +99,7 @@ fun MapLibreMap(
     val currentColors = rememberUpdatedState(stationColors)
     val currentOnStationClick = rememberUpdatedState(onStationClick)
     val currentLocationColor = rememberUpdatedState(locationColor)
+    val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember {
@@ -137,9 +139,10 @@ fun MapLibreMap(
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                 LabelLanguage.apply(style, labelLanguage)
                 // Added first, so it lies under the stations.
-                UserLocationLayers.addTo(style, currentLocationColor.value)
+                UserLocationLayers.addBelowStations(style, currentLocationColor.value, currentLocationHalo.value)
                 // A new style starts empty: add our source and layers every time.
                 StationLayers.addTo(style, currentColors.value, labelFont, density, mapLabels)
+                UserLocationLayers.addAboveStations(style, currentLocationColor.value, currentLocationHalo.value, density)
                 loadedStyle = style
             }
         }
