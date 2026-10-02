@@ -68,6 +68,8 @@
     <string name="cluster_from_price">da %1$s</string>
 
     <!-- Scheda: carburante scelto e confronto -->
+    <string name="station_also_here">Nello stesso punto: %1$s</string>
+    <string name="station_other_listing">Un\'altra scheda nello stesso punto</string>
     <string name="station_does_not_sell">Non vende %1$s</string>
     <string name="compare_below">%1$s cent sotto il prezzo tipico %2$s</string>
     <string name="compare_above">%1$s cent sopra il prezzo tipico %2$s</string>

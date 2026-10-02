@@ -76,6 +76,8 @@
 
     <!-- Station sheet: chosen fuel and comparison -->
     <!-- %1$s = fuel and mode, e.g. "Petrol · Self" -->
+    <string name="station_also_here">Also at this location: %1$s</string>
+    <string name="station_other_listing">Another listing at this location</string>
     <string name="station_does_not_sell">Doesn\'t sell %1$s</string>
     <!-- %1$s = cents (e.g. "4.5"), %2$s = one of compare_group_* -->
     <string name="compare_below">%1$s cents below the typical price %2$s</string>

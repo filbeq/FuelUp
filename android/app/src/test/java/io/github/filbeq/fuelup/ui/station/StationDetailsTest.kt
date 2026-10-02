@@ -103,4 +103,21 @@ class StationDetailsTest {
         assertEquals("Q8", details.displayName)
         assertEquals(FuelKind.OTHER, details.rows[0].kind)
     }
+
+    @Test
+    fun stationsAtTheSameSpotAreLinked() {
+        fun station(id: Int, name: String, lat: Double) =
+            Station(id, name, 0, 0, "VIA X", "ROMA", "RM", lat, 12.5, listOf(longArrayOf(0, 1500, 1, 0)))
+        val file = StationsFile(
+            schemaVersion = 1,
+            dataDate = "2026-09-30",
+            brands = listOf("Q8"),
+            fuels = listOf(Fuel("Benzina", "PETROL", "L", std = true)),
+            stations = listOf(station(1, "A", 41.9), station(2, "", 41.9), station(3, "C", 41.90001)),
+        )
+        val snapshot = Snapshot(snapshot.meta, file)
+        assertEquals(listOf(OtherStation(2, "Q8")), snapshot.stationDetails(1)!!.sameLocation)
+        assertEquals(listOf(OtherStation(1, "A")), snapshot.stationDetails(2)!!.sameLocation)
+        assertEquals(emptyList<OtherStation>(), snapshot.stationDetails(3)!!.sameLocation)
+    }
 }

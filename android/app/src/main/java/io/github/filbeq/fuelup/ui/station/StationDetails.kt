@@ -44,9 +44,17 @@ data class StationDetails(
     val lon: Double,
     /** One row per fuel, in the data's order (by type, standard fuel first). */
     val rows: List<FuelRow>,
+    /**
+     * Other stations at exactly the same coordinates (two registrations at one
+     * site): their markers are drawn on top of each other, so the sheet links them.
+     */
+    val sameLocation: List<OtherStation> = emptyList(),
 ) {
     val displayName: String get() = name.ifEmpty { brand }
 }
+
+/** A station the sheet links to, by id and display name. */
+data class OtherStation(val id: Int, val displayName: String)
 
 /** Standard fuel names that are fully described by their localized type label. */
 private val PLAIN_STANDARD_NAMES = setOf("benzina", "gasolio", "gpl", "metano", "gnl")
@@ -68,7 +76,12 @@ fun Snapshot.stationDetails(id: Int): StationDetails? {
     // Stations are sorted by id (the pipeline writes them that way).
     val index = stations.binarySearch { it.id.compareTo(id) }
     if (index < 0) return null
-    return stations[index].toDetails(this.stations)
+    val station = stations[index]
+    // A plain scan: ~20k comparisons, once per tap.
+    val sameLocation = stations
+        .filter { it.id != id && it.lat == station.lat && it.lon == station.lon }
+        .map { OtherStation(it.id, it.name.ifEmpty { this.stations.brands.getOrElse(it.brand) { "" } }) }
+    return station.toDetails(this.stations).copy(sameLocation = sameLocation)
 }
 
 private fun Station.toDetails(file: StationsFile): StationDetails {

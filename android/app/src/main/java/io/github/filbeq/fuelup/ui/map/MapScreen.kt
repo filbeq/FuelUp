@@ -153,6 +153,7 @@ fun MapScreen(
                         details = it,
                         choice = state.choice,
                         ranked = state.ranking[it.id],
+                        onOpenStation = onStationClick,
                         modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
                     )
                     StationSheetBody(it, state.choice)

@@ -9,6 +9,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -60,10 +62,17 @@ import java.time.format.DateTimeFormatter
  * Header of the station sheet: what's visible when the sheet is collapsed
  * (name, brand, and the price of the chosen fuel with how it compares).
  * [StationSheetBody] follows it when expanded. [ranked] is the station's
- * price for [choice] (null if it doesn't sell it).
+ * price for [choice] (null if it doesn't sell it). Other stations at the same
+ * spot are listed underneath; tapping one calls [onOpenStation].
  */
 @Composable
-fun StationSheetHeader(details: StationDetails, choice: FuelChoice, ranked: RankedPrice?, modifier: Modifier = Modifier) {
+fun StationSheetHeader(
+    details: StationDetails,
+    choice: FuelChoice,
+    ranked: RankedPrice?,
+    onOpenStation: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
         Text(
             details.displayName,
@@ -85,6 +94,20 @@ fun StationSheetHeader(details: StationDetails, choice: FuelChoice, ranked: Rank
         }
         Spacer(Modifier.height(8.dp))
         ChosenPrice(choice, ranked)
+        details.sameLocation.forEach { other ->
+            TextButton(onClick = { onOpenStation(other.id) }, contentPadding = PaddingValues(0.dp)) {
+                Text(
+                    // Most such pairs share the name (e.g. a motorway area with a separate diesel listing).
+                    if (other.displayName == details.displayName) {
+                        stringResource(R.string.station_other_listing)
+                    } else {
+                        stringResource(R.string.station_also_here, other.displayName)
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
