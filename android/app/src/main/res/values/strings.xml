@@ -125,4 +125,5 @@
     <string name="nearby_empty">No station within %1$d km sells %2$s.</string>
     <string name="action_widen_radius">Search within %1$d km</string>
     <string name="class_not_compared">Not compared</string>
+    <string name="action_show_list">Show the list</string>
 </resources>

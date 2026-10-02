@@ -113,4 +113,5 @@
     <string name="nearby_empty">Nessun distributore entro %1$d km vende %2$s.</string>
     <string name="action_widen_radius">Cerca entro %1$d km</string>
     <string name="class_not_compared">Non confrontato</string>
+    <string name="action_show_list">Mostra l\'elenco</string>
 </resources>

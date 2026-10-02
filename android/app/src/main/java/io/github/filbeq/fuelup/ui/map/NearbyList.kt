@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -23,10 +24,17 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -58,8 +66,12 @@ private const val PEEK_ROWS = 2
 
 /**
  * "Near you": the stations within the chosen radius that sell [choice],
- * cheapest (or nearest) first. The controls and the first rows form the
- * collapsed sheet ([headerModifier] measures them); the rest scrolls below.
+ * cheapest (or nearest) first. Only the header (title, order, radius) is
+ * fixed; every row is in one scrolling list ([listState]).
+ *
+ * Heights are reported through [onMeasured] for the sheet: the title row alone
+ * (the minimised sheet) and header + first [PEEK_ROWS] rows (the collapsed
+ * sheet). When [minimised], tapping the title calls [onExpand].
  */
 @Composable
 fun NearbyList(
@@ -67,21 +79,40 @@ fun NearbyList(
     choice: FuelChoice,
     stations: List<NearbyStation>,
     brands: List<String>,
+    listState: LazyListState,
+    minimised: Boolean,
+    onExpand: () -> Unit,
     onRadiusChange: (Int) -> Unit,
     onSortChange: (NearbySort) -> Unit,
     onStationClick: (NearbyStation) -> Unit,
+    onMeasured: (titlePx: Int, collapsedPx: Int) -> Unit,
     modifier: Modifier = Modifier,
-    headerModifier: Modifier = Modifier,
 ) {
     val now = remember(stations) { Instant.now() }
     val locale = LocalConfiguration.current.locales[0]
     val settings = state.settings
     val approximate = (state.position?.accuracyMeters ?: Float.MAX_VALUE) > PRECISE_METERS
+    var titlePx by remember { mutableIntStateOf(0) }
+    var headerPx by remember { mutableIntStateOf(0) }
+    val rowPx = remember { mutableStateListOf(0, 0) }
+    val currentOnMeasured by rememberUpdatedState(onMeasured)
+    LaunchedEffect(titlePx, headerPx, rowPx.toList(), stations.size) {
+        val rows = (0 until minOf(PEEK_ROWS, stations.size)).sumOf { rowPx[it] }
+        if (titlePx > 0 && headerPx > 0) currentOnMeasured(titlePx, headerPx + rows)
+    }
     Column(modifier.fillMaxWidth()) {
-        Column(headerModifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).onSizeChanged { headerPx = it.height }) {
             // Title, then the order switch on the right; radius chips below.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            Row(
+                Modifier.onSizeChanged { titlePx = it.height },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val showList = stringResource(R.string.action_show_list)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .then(if (minimised) Modifier.clickable(onClickLabel = showList, onClick = onExpand) else Modifier),
+                ) {
                     Text(
                         stringResource(R.string.near_me_title),
                         style = MaterialTheme.typography.titleLarge,
@@ -135,11 +166,11 @@ fun NearbyList(
                     }
                 }
             }
-            stations.take(PEEK_ROWS).forEach { NearbyRow(it, choice, brands, approximate, now, onStationClick) }
         }
-        if (stations.size > PEEK_ROWS) {
-            LazyColumn(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
-                items(stations.drop(PEEK_ROWS), key = { it.station.id }) { NearbyRow(it, choice, brands, approximate, now, onStationClick) }
+        LazyColumn(Modifier.padding(horizontal = 16.dp).navigationBarsPadding(), state = listState) {
+            itemsIndexed(stations, key = { _, item -> item.station.id }) { index, item ->
+                val measure = if (index < PEEK_ROWS) Modifier.onSizeChanged { rowPx[index] = it.height } else Modifier
+                NearbyRow(item, choice, brands, approximate, now, onStationClick, measure)
             }
         }
     }
@@ -153,56 +184,59 @@ private fun NearbyRow(
     approximate: Boolean,
     now: Instant,
     onClick: (NearbyStation) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val station = item.station
     val brand = brands.getOrElse(station.brand) { "" }
     val density = LocalDensity.current.density
     val icon = remember(item.price.priceClass, density) { StationIcons.draw(item.price.priceClass, density).asImageBitmap() }
     val price = PriceInfo(item.price.priceMilli, Instant.ofEpochSecond(item.price.updatedEpochSeconds))
-    HorizontalDivider()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button) { onClick(item) }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Image(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                station.name.ifEmpty { brand },
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier) {
+        HorizontalDivider()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { onClick(item) }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Image(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    listOfNotNull(
-                        brand.takeIf { station.name.isNotEmpty() && it.isNotEmpty() },
-                        formatDistance(item.distanceKm, approximate, LocalConfiguration.current.locales[0]),
-                    )
-                        .joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    station.name.ifEmpty { brand },
+                    style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
                 )
-                // Only reachable from the motorway: worth knowing before driving there.
-                if (station.motorway == 1) MotorwayBadge()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        listOfNotNull(
+                            brand.takeIf { station.name.isNotEmpty() && it.isNotEmpty() },
+                            formatDistance(item.distanceKm, approximate, LocalConfiguration.current.locales[0]),
+                        )
+                            .joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    // Only reachable from the motorway: worth knowing before driving there.
+                    if (station.motorway == 1) MotorwayBadge()
+                }
+                Text(
+                    "${classText(item.price.priceClass)} · ${reportedText(price, now)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Text(
-                "${classText(item.price.priceClass)} · ${reportedText(price, now)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                formatPrice(price, perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
         }
-        Text(
-            formatPrice(price, perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 

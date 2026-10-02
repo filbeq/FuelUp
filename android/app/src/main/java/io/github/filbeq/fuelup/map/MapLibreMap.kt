@@ -82,6 +82,8 @@ fun MapLibreMap(
     selectedStationId: Int?,
     /** Called with the id of a tapped station. Taps on clusters zoom in. */
     onStationClick: (Int) -> Unit,
+    /** A tap that hit no station and no cluster. */
+    onMapTapEmpty: () -> Unit,
     /** The user's position (null = unknown or not asked), see [UserLocationLayers]. */
     userPosition: UserPosition?,
     /** "Near me" search circle around [userPosition], or null. */
@@ -98,6 +100,7 @@ fun MapLibreMap(
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     val currentColors = rememberUpdatedState(stationColors)
     val currentOnStationClick = rememberUpdatedState(onStationClick)
+    val currentOnMapTapEmpty = rememberUpdatedState(onMapTapEmpty)
     val currentLocationColor = rememberUpdatedState(locationColor)
     val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
@@ -119,9 +122,11 @@ fun MapLibreMap(
                 map.addOnMapClickListener { latLng ->
                     val style = map.style?.takeIf { it.isFullyLoaded } ?: return@addOnMapClickListener false
                     val point = map.projection.toScreenLocation(latLng)
-                    StationLayers.handleTap(map, style, point, resources.displayMetrics.density) {
+                    val hit = StationLayers.handleTap(map, style, point, resources.displayMetrics.density) {
                         currentOnStationClick.value(it)
                     }
+                    if (!hit) currentOnMapTapEmpty.value()
+                    hit
                 }
                 map.addOnCameraIdleListener {
                     val position = map.cameraPosition

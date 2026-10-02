@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -153,6 +155,11 @@ fun MapScreen(
 
     // The sheet shows the selected station, else the "near me" panel; with neither, it hides.
     val sheetWanted = selectedStationId != null || nearMe.open
+    val listShown = selectedStationId == null && nearMe.open && nearMe.status == NearMeStatus.Located && state.snapshot != null
+    // An empty-map tap lowers the list to its title row ("minimised"); the title,
+    // a drag up or the my-location button bring it back. Kept across a station visit.
+    var nearbyMinimised by rememberSaveable { mutableStateOf(false) }
+    val nearbyListState = rememberLazyListState()
     LaunchedEffect(sheetWanted) {
         if (sheetWanted) {
             if (sheetState.currentValue == SheetValue.Hidden) sheetState.partialExpand()
@@ -167,7 +174,12 @@ fun MapScreen(
             if (value == SheetValue.Hidden && previous != SheetValue.Hidden) {
                 currentOnDismiss()
                 currentOnCloseNearMe()
+                nearbyMinimised = false
             }
+            // Dragged all the way up: the list is back in full.
+            if (value == SheetValue.Expanded) nearbyMinimised = false
+            // Back to the collapsed sheet: show the first rows again.
+            if (value == SheetValue.PartiallyExpanded && previous == SheetValue.Expanded) nearbyListState.scrollToItem(0)
             previous = value
         }
     }
@@ -181,16 +193,39 @@ fun MapScreen(
             when {
                 sheetState.currentValue == SheetValue.Expanded -> sheetState.partialExpand()
                 selectedStationId != null -> onDismissStation()
-                else -> onCloseNearMe()
+                else -> {
+                    onCloseNearMe()
+                    nearbyMinimised = false
+                }
             }
+        }
+    }
+    // Minimising also lowers an expanded sheet.
+    LaunchedEffect(nearbyMinimised) {
+        if (nearbyMinimised && sheetState.currentValue == SheetValue.Expanded) sheetState.partialExpand()
+    }
+    // An empty spot on the map: leave the station (back to what was there before),
+    // else lower the "near me" list.
+    val onMapTapEmpty = {
+        when {
+            selectedStationId != null -> onDismissStation()
+            listShown -> nearbyMinimised = true
         }
     }
 
     // Collapsed height = drag handle + header (+ gesture/navigation bar), measured.
     var handleHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightPx by remember { mutableIntStateOf(0) }
+    // The "near me" list's title row and its collapsed height (header + first rows).
+    var nearbyTitlePx by remember { mutableIntStateOf(0) }
+    var nearbyCollapsedPx by remember { mutableIntStateOf(0) }
     val navBarPx = WindowInsets.navigationBars.getBottom(density)
-    val peekHeight = with(density) { (handleHeightPx + headerHeightPx + navBarPx).toDp() }
+    val contentPeekPx = when {
+        !listShown -> headerHeightPx
+        nearbyMinimised -> nearbyTitlePx
+        else -> nearbyCollapsedPx
+    }
+    val peekHeight = with(density) { (handleHeightPx + contentPeekPx + navBarPx).toDp() }
 
     // Where the sheet's top edge is, so the map credits can stay above it.
     var sheetTopPx by remember { mutableFloatStateOf(Float.MAX_VALUE) }
@@ -213,9 +248,7 @@ fun MapScreen(
     // A new position: fit the search circle between the top controls and the sheet.
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
     val radiusKm = nearMe.settings.radiusKm
-    // Collapsed height of the "near me" list, once measured: the part of the map it covers.
-    var nearbyHeaderPx by remember { mutableIntStateOf(0) }
-    LaunchedEffect(nearMe.fixCount, radiusKm, nearbyHeaderPx > 0) {
+    LaunchedEffect(nearMe.fixCount, radiusKm, nearbyCollapsedPx > 0) {
         val position = nearMe.position ?: return@LaunchedEffect
         cameraCommand = CameraCommand(
             id = (cameraCommand?.id ?: 0) + 1,
@@ -224,8 +257,8 @@ fun MapScreen(
                 position.lon,
                 radiusKm.toDouble(),
                 topPx = topControlsPx,
-                bottomPx = if (nearbyHeaderPx > 0) {
-                    handleHeightPx + nearbyHeaderPx + navBarPx
+                bottomPx = if (nearbyCollapsedPx > 0) {
+                    handleHeightPx + nearbyCollapsedPx + navBarPx
                 } else {
                     (mapHeightPx * SHEET_SHARE).roundToInt()
                 },
@@ -258,6 +291,9 @@ fun MapScreen(
                         choice = state.choice,
                         stations = nearby,
                         brands = state.snapshot.stations.brands,
+                        listState = nearbyListState,
+                        minimised = nearbyMinimised,
+                        onExpand = { nearbyMinimised = false },
                         onRadiusChange = onRadiusChange,
                         onSortChange = onSortChange,
                         onStationClick = { item ->
@@ -274,9 +310,9 @@ fun MapScreen(
                                 ),
                             )
                         },
-                        headerModifier = Modifier.onSizeChanged { size ->
-                            headerHeightPx = size.height
-                            nearbyHeaderPx = size.height
+                        onMeasured = { titlePx, collapsedPx ->
+                            nearbyTitlePx = titlePx
+                            nearbyCollapsedPx = collapsedPx
                         },
                     )
                 } else if (nearMe.open) {
@@ -330,7 +366,9 @@ fun MapScreen(
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
                 selectedStationId = selectedStationId,
                 onStationClick = onStationClick,
-                userPosition = nearMe.position,
+                onMapTapEmpty = onMapTapEmpty,
+                // Shown only while "near me" is open: closing it clears the map.
+                userPosition = nearMe.position.takeIf { nearMe.open },
                 searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },
                 // Like the clusters, by the map's darkness (the app theme may differ).
                 locationColor = (if (mapIsDark) LocationColorDark else LocationColorLight).toArgb(),
@@ -350,6 +388,7 @@ fun MapScreen(
             MapAttributionBar(onClick = onOpenAbout, modifier = Modifier.align(Alignment.BottomStart).then(aboveSheet))
             SmallFloatingActionButton(
                 onClick = {
+                    nearbyMinimised = false
                     onOpenNearMe()
                     requestLocation()
                 },
