@@ -156,7 +156,7 @@ fun MapScreen(
     // The sheet shows the selected station, else the "near me" panel; with neither, it hides.
     val sheetWanted = selectedStationId != null || nearMe.open
     val listShown = selectedStationId == null && nearMe.open && nearMe.status == NearMeStatus.Located && state.snapshot != null
-    // An empty-map tap lowers the list to its title row ("minimised"); the title,
+    // An empty-map tap lowers the list to its header ("minimised"); the title,
     // a drag up or the my-location button bring it back. Kept across a station visit.
     var nearbyMinimised by rememberSaveable { mutableStateOf(false) }
     val nearbyListState = rememberLazyListState()
@@ -216,13 +216,13 @@ fun MapScreen(
     // Collapsed height = drag handle + header (+ gesture/navigation bar), measured.
     var handleHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightPx by remember { mutableIntStateOf(0) }
-    // The "near me" list's title row and its collapsed height (header + first rows).
-    var nearbyTitlePx by remember { mutableIntStateOf(0) }
+    // The "near me" list's header (the minimised sheet) and its collapsed height (header + first rows).
+    var nearbyHeaderPx by remember { mutableIntStateOf(0) }
     var nearbyCollapsedPx by remember { mutableIntStateOf(0) }
     val navBarPx = WindowInsets.navigationBars.getBottom(density)
     val contentPeekPx = when {
         !listShown -> headerHeightPx
-        nearbyMinimised -> nearbyTitlePx
+        nearbyMinimised -> nearbyHeaderPx
         else -> nearbyCollapsedPx
     }
     val peekHeight = with(density) { (handleHeightPx + contentPeekPx + navBarPx).toDp() }
@@ -310,8 +310,8 @@ fun MapScreen(
                                 ),
                             )
                         },
-                        onMeasured = { titlePx, collapsedPx ->
-                            nearbyTitlePx = titlePx
+                        onMeasured = { headerPx, collapsedPx ->
+                            nearbyHeaderPx = headerPx
                             nearbyCollapsedPx = collapsedPx
                         },
                     )

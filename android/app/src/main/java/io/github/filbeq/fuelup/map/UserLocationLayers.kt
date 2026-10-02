@@ -18,7 +18,7 @@ import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
-import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
 import kotlin.math.roundToInt
@@ -60,13 +60,11 @@ object UserLocationLayers {
         style.addLayer(FillLayer(ACCURACY_FILL_ID, SOURCE_ID).withFilter(accuracy).withProperties(fillColor(color), fillOpacity(0.2f)))
         style.addLayer(LineLayer(ACCURACY_HALO_ID, SOURCE_ID).withFilter(accuracy).withProperties(lineColor(halo), lineWidth(4f)))
         style.addLayer(LineLayer(ACCURACY_LINE_ID, SOURCE_ID).withFilter(accuracy).withProperties(lineColor(color), lineWidth(2f)))
-        style.addLayer(LineLayer(RADIUS_HALO_ID, SOURCE_ID).withFilter(radius).withProperties(lineColor(halo), lineWidth(6f)))
+        // A solid line on a soft halo (a dashed line showed the halo as dark dashes).
         style.addLayer(
-            LineLayer(RADIUS_LINE_ID, SOURCE_ID)
-                .withFilter(radius)
-                // Dash lengths are in line widths: 3 dp dashes of 9 dp, gaps of 6 dp.
-                .withProperties(lineColor(color), lineWidth(3f), lineDasharray(arrayOf(3f, 2f))),
+            LineLayer(RADIUS_HALO_ID, SOURCE_ID).withFilter(radius).withProperties(lineColor(halo), lineWidth(5f), lineOpacity(0.5f)),
         )
+        style.addLayer(LineLayer(RADIUS_LINE_ID, SOURCE_ID).withFilter(radius).withProperties(lineColor(color), lineWidth(2.5f)))
     }
 
     /**

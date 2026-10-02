@@ -69,9 +69,9 @@ private const val PEEK_ROWS = 2
  * cheapest (or nearest) first. Only the header (title, order, radius) is
  * fixed; every row is in one scrolling list ([listState]).
  *
- * Heights are reported through [onMeasured] for the sheet: the title row alone
- * (the minimised sheet) and header + first [PEEK_ROWS] rows (the collapsed
- * sheet). When [minimised], tapping the title calls [onExpand].
+ * Heights are reported through [onMeasured] for the sheet: the header alone
+ * (the minimised sheet: title, order, radius) and header + first [PEEK_ROWS]
+ * rows (the collapsed sheet). When [minimised], tapping the title calls [onExpand].
  */
 @Composable
 fun NearbyList(
@@ -85,28 +85,24 @@ fun NearbyList(
     onRadiusChange: (Int) -> Unit,
     onSortChange: (NearbySort) -> Unit,
     onStationClick: (NearbyStation) -> Unit,
-    onMeasured: (titlePx: Int, collapsedPx: Int) -> Unit,
+    onMeasured: (headerPx: Int, collapsedPx: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val now = remember(stations) { Instant.now() }
     val locale = LocalConfiguration.current.locales[0]
     val settings = state.settings
     val approximate = (state.position?.accuracyMeters ?: Float.MAX_VALUE) > PRECISE_METERS
-    var titlePx by remember { mutableIntStateOf(0) }
     var headerPx by remember { mutableIntStateOf(0) }
     val rowPx = remember { mutableStateListOf(0, 0) }
     val currentOnMeasured by rememberUpdatedState(onMeasured)
-    LaunchedEffect(titlePx, headerPx, rowPx.toList(), stations.size) {
+    LaunchedEffect(headerPx, rowPx.toList(), stations.size) {
         val rows = (0 until minOf(PEEK_ROWS, stations.size)).sumOf { rowPx[it] }
-        if (titlePx > 0 && headerPx > 0) currentOnMeasured(titlePx, headerPx + rows)
+        if (headerPx > 0) currentOnMeasured(headerPx, headerPx + rows)
     }
     Column(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).onSizeChanged { headerPx = it.height }) {
             // Title, then the order switch on the right; radius chips below.
-            Row(
-                Modifier.onSizeChanged { titlePx = it.height },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 val showList = stringResource(R.string.action_show_list)
                 Column(
                     Modifier
