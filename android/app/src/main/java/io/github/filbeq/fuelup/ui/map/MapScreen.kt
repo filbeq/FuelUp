@@ -42,6 +42,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -298,17 +299,24 @@ fun MapScreen(
                         onSortChange = onSortChange,
                         onStationClick = { item ->
                             onStationClick(item.station.id)
-                            // Bring it into the free part of the map, zoomed in enough to show it alone.
-                            cameraCommand = CameraCommand(
-                                id = (cameraCommand?.id ?: 0) + 1,
-                                move = CameraMove.Show(
-                                    item.station.lat,
-                                    item.station.lon,
-                                    minZoom = STATION_ZOOM,
-                                    topPx = topControlsPx,
-                                    bottomPx = (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt(),
-                                ),
-                            )
+                            scope.launch {
+                                // From the expanded list: show the station collapsed (its
+                                // chosen-fuel price), as from the collapsed list.
+                                if (sheetState.currentValue == SheetValue.Expanded) sheetState.partialExpand()
+                                // Let the sheet settle, so the free part of the map is known.
+                                withFrameNanos { }
+                                // Bring it into the free part of the map, zoomed in enough to show it alone.
+                                cameraCommand = CameraCommand(
+                                    id = (cameraCommand?.id ?: 0) + 1,
+                                    move = CameraMove.Show(
+                                        item.station.lat,
+                                        item.station.lon,
+                                        minZoom = STATION_ZOOM,
+                                        topPx = topControlsPx,
+                                        bottomPx = (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt(),
+                                    ),
+                                )
+                            }
                         },
                         onMeasured = { headerPx, collapsedPx ->
                             nearbyHeaderPx = headerPx
