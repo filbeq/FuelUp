@@ -2,6 +2,7 @@ package io.github.filbeq.fuelup.map
 
 import androidx.annotation.StringRes
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.data.MapStyleMode
 
 /** One credit line required by a map provider, with the page it links to. */
 data class MapAttribution(@StringRes val label: Int, val url: String)
@@ -14,6 +15,13 @@ data class MapProvider(
     val labelFont: String,
     val attributions: List<MapAttribution>,
 )
+
+/** The style to load for a map-style setting and the current app theme. */
+fun MapProvider.styleUrl(mode: MapStyleMode, darkTheme: Boolean): String = when (mode) {
+    MapStyleMode.AUTOMATIC -> if (darkTheme) darkStyleUrl else lightStyleUrl
+    MapStyleMode.LIGHT -> lightStyleUrl
+    MapStyleMode.DARK -> darkStyleUrl
+}
 
 /** OpenFreeMap: free vector tiles from OpenStreetMap data, no API key needed. */
 val OpenFreeMap = MapProvider(

@@ -5,7 +5,10 @@ import android.os.StrictMode
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import io.github.filbeq.fuelup.data.AppSettingsStore
 import io.github.filbeq.fuelup.ui.FuelUpApp
+import io.github.filbeq.fuelup.ui.settings.nightMode
 import io.github.filbeq.fuelup.ui.theme.FuelUpTheme
 import org.maplibre.android.MapLibre
 
@@ -16,6 +19,7 @@ import org.maplibre.android.MapLibre
  */
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedTheme()
         super.onCreate(savedInstanceState)
         if (BuildConfig.DEBUG) {
             // Debug builds log any disk or network access on the main thread.
@@ -28,6 +32,23 @@ class MainActivity : AppCompatActivity() {
             FuelUpTheme {
                 FuelUpApp()
             }
+        }
+    }
+
+    /**
+     * Applies the saved light/dark setting before the first frame (no flash).
+     * Only on the first start of the process: after the user changes it,
+     * AppCompat already holds the new value and recreates the screen with it.
+     */
+    private fun applySavedTheme() {
+        if (AppCompatDelegate.getDefaultNightMode() != AppCompatDelegate.MODE_NIGHT_UNSPECIFIED) return
+        // One tiny file, read once at start: allowed on the main thread on purpose.
+        val oldPolicy = StrictMode.allowThreadDiskReads()
+        try {
+            val prefs = getSharedPreferences(AppSettingsStore.PREFS_NAME, MODE_PRIVATE)
+            AppCompatDelegate.setDefaultNightMode(AppSettingsStore(prefs).load().theme.nightMode())
+        } finally {
+            StrictMode.setThreadPolicy(oldPolicy)
         }
     }
 }

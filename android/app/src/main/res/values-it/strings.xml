@@ -5,7 +5,6 @@
     <string name="attribution_osm">© contributori di OpenStreetMap</string>
 
     <!-- Azioni -->
-    <string name="action_about">Informazioni</string>
     <string name="action_back">Indietro</string>
     <string name="action_show_credits">Mostra i crediti</string>
 
@@ -83,4 +82,17 @@
     <string name="about_compare_title">Come si confrontano i prezzi</string>
     <string name="about_compare_body">Ogni distributore è confrontato con il prezzo tipico (mediano) dei 25 distributori più vicini che vendono lo stesso carburante, entro 50 km: almeno 2 cent in meno è economico, almeno 2 cent in più è caro. Le aree di servizio autostradali sono confrontate solo tra loro, così come i distributori della zona extradoganale di Livigno.</string>
     <string name="about_compare_verify">Un prezzo molto più basso di quello tipico (35 cent per benzina e gasolio) è segnato \"da verificare\": potrebbe essere un errore di comunicazione, quindi verificalo alla pompa.</string>
+
+    <!-- Impostazioni -->
+    <string name="settings_title">Impostazioni</string>
+    <string name="settings_theme">Tema</string>
+    <string name="theme_system">Predefinito di sistema</string>
+    <string name="theme_light">Chiaro</string>
+    <string name="theme_dark">Scuro</string>
+    <string name="settings_map_style">Stile della mappa</string>
+    <string name="map_style_automatic">Automatico (segue il tema)</string>
+    <string name="map_style_light">Chiaro</string>
+    <string name="map_style_dark">Scuro</string>
+    <string name="settings_language">Lingua</string>
+    <string name="language_system">Predefinita di sistema</string>
 </resources>

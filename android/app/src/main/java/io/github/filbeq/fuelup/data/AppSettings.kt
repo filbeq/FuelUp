@@ -1,0 +1,45 @@
+package io.github.filbeq.fuelup.data
+
+import android.content.SharedPreferences
+import androidx.core.content.edit
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+/** AUTOMATIC uses the dark map style with the dark app theme and the light one otherwise. */
+enum class MapStyleMode { AUTOMATIC, LIGHT, DARK }
+
+/**
+ * Appearance settings we store ourselves. (The app language is stored by
+ * AppCompat on Android < 13 and by the system on 13+, see SettingsViewModel.)
+ */
+data class AppSettings(
+    val theme: ThemeMode = ThemeMode.SYSTEM,
+    val mapStyle: MapStyleMode = MapStyleMode.AUTOMATIC,
+) {
+    companion object {
+        /** Rebuilds saved settings; anything unknown falls back to the default. */
+        fun decode(theme: String?, mapStyle: String?) = AppSettings(
+            theme = ThemeMode.entries.firstOrNull { it.name == theme } ?: ThemeMode.SYSTEM,
+            mapStyle = MapStyleMode.entries.firstOrNull { it.name == mapStyle } ?: MapStyleMode.AUTOMATIC,
+        )
+    }
+}
+
+/** Saves [AppSettings] in the same SharedPreferences file as the fuel choice. */
+class AppSettingsStore(private val prefs: SharedPreferences) {
+    fun load(): AppSettings = AppSettings.decode(prefs.getString(KEY_THEME, null), prefs.getString(KEY_MAP_STYLE, null))
+
+    fun save(settings: AppSettings) {
+        prefs.edit {
+            putString(KEY_THEME, settings.theme.name)
+            putString(KEY_MAP_STYLE, settings.mapStyle.name)
+        }
+    }
+
+    companion object {
+        /** The app's SharedPreferences file (also used by [FuelChoiceStore]). */
+        const val PREFS_NAME = "settings"
+        private const val KEY_THEME = "theme"
+        private const val KEY_MAP_STYLE = "mapStyle"
+    }
+}

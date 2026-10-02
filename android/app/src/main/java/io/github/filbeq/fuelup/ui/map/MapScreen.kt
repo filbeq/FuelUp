@@ -49,12 +49,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
+import io.github.filbeq.fuelup.data.MapStyleMode
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.LabelLanguage
 import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.map.MapLabels
 import io.github.filbeq.fuelup.map.MapLibreMap
 import io.github.filbeq.fuelup.map.StationColors
+import io.github.filbeq.fuelup.map.styleUrl
 import io.github.filbeq.fuelup.ui.station.StationDetails
 import io.github.filbeq.fuelup.ui.station.StationSheetBody
 import io.github.filbeq.fuelup.ui.station.StationSheetHeader
@@ -73,11 +75,13 @@ fun MapScreen(
     state: MapUiState,
     onRetry: () -> Unit,
     onChoiceChange: (FuelChoice) -> Unit,
+    mapStyle: MapStyleMode,
     camera: MapCamera,
     onCameraChange: (MapCamera) -> Unit,
     selectedStationId: Int?,
     onStationClick: (Int) -> Unit,
     onDismissStation: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     val provider = CurrentMapProvider
@@ -156,10 +160,10 @@ fun MapScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    IconButton(onClick = onOpenAbout) {
+                    IconButton(onClick = onOpenSettings) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_info),
-                            contentDescription = stringResource(R.string.action_about),
+                            painter = painterResource(R.drawable.ic_settings),
+                            contentDescription = stringResource(R.string.settings_title),
                         )
                     }
                 },
@@ -174,7 +178,7 @@ fun MapScreen(
                 .onGloballyPositioned { mapBottomPx = it.boundsInWindow().bottom },
         ) {
             MapLibreMap(
-                styleUrl = if (isSystemInDarkTheme()) provider.darkStyleUrl else provider.lightStyleUrl,
+                styleUrl = provider.styleUrl(mapStyle, darkTheme = isSystemInDarkTheme()),
                 camera = camera,
                 onCameraIdle = onCameraChange,
                 stationsGeoJson = state.stationsGeoJson,

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.filbeq.fuelup.BuildConfig
 import io.github.filbeq.fuelup.PerfLog
+import io.github.filbeq.fuelup.data.AppSettingsStore
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelChoiceStore
 import io.github.filbeq.fuelup.data.HttpFetcher
@@ -68,7 +69,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val choiceStore by lazy {
-        FuelChoiceStore(application.getSharedPreferences("settings", Application.MODE_PRIVATE))
+        FuelChoiceStore(application.getSharedPreferences(AppSettingsStore.PREFS_NAME, Application.MODE_PRIVATE))
     }
 
     private val _state = MutableStateFlow(MapUiState())

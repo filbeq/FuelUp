@@ -15,11 +15,16 @@ import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.ui.about.AboutScreen
 import io.github.filbeq.fuelup.ui.map.MapScreen
 import io.github.filbeq.fuelup.ui.map.MapViewModel
+import io.github.filbeq.fuelup.ui.settings.SettingsScreen
+import io.github.filbeq.fuelup.ui.settings.SettingsViewModel
 import kotlinx.serialization.Serializable
 
 /** The app's screens. The back stack is a list of these (Navigation 3). */
 @Serializable
 data object MapRoute : NavKey
+
+@Serializable
+data object SettingsRoute : NavKey
 
 @Serializable
 data object AboutRoute : NavKey
@@ -32,8 +37,12 @@ data object AboutRoute : NavKey
  * the navigation, so they survive moving to another screen and back.
  */
 @Composable
-fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
+fun FuelUpApp(
+    mapViewModel: MapViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel(),
+) {
     val mapState by mapViewModel.state.collectAsStateWithLifecycle()
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
     var selectedStationId by rememberSaveable { mutableStateOf<Int?>(null) }
     val backStack = rememberNavBackStack(MapRoute)
@@ -47,12 +56,25 @@ fun FuelUpApp(mapViewModel: MapViewModel = viewModel()) {
                     state = mapState,
                     onRetry = mapViewModel::retry,
                     onChoiceChange = mapViewModel::setChoice,
+                    mapStyle = settings.mapStyle,
                     camera = camera,
                     onCameraChange = { camera = it },
                     selectedStationId = selectedStationId,
                     onStationClick = { selectedStationId = it },
                     onDismissStation = { selectedStationId = null },
+                    onOpenSettings = { backStack.add(SettingsRoute) },
                     onOpenAbout = { backStack.add(AboutRoute) },
+                )
+            }
+            entry<SettingsRoute> {
+                SettingsScreen(
+                    settings = settings,
+                    language = settingsViewModel.language(),
+                    onThemeChange = settingsViewModel::setTheme,
+                    onMapStyleChange = settingsViewModel::setMapStyle,
+                    onLanguageChange = settingsViewModel::setLanguage,
+                    onOpenAbout = { backStack.add(AboutRoute) },
+                    onBack = { backStack.removeAt(backStack.lastIndex) },
                 )
             }
             entry<AboutRoute> {
