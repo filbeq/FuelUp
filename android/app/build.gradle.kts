@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     // In-app language (also on Android < 13) and the light/dark setting.
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))
