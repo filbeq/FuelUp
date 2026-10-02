@@ -59,6 +59,8 @@ import androidx.core.content.ContextCompat
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
+import io.github.filbeq.fuelup.data.Nearby
+import io.github.filbeq.fuelup.data.NearbySort
 import io.github.filbeq.fuelup.data.isDark
 import io.github.filbeq.fuelup.map.CameraCommand
 import io.github.filbeq.fuelup.map.CameraMove
@@ -105,6 +107,8 @@ fun MapScreen(
     /** Permission refused; true if the system won't ask again. */
     onLocationDenied: (Boolean) -> Unit,
     onCloseNearMe: () -> Unit,
+    onRadiusChange: (Int) -> Unit,
+    onSortChange: (NearbySort) -> Unit,
 ) {
     val provider = CurrentMapProvider
     val scope = rememberCoroutineScope()
@@ -116,11 +120,12 @@ fun MapScreen(
     val currentOnDismiss by rememberUpdatedState(onDismissStation)
     val currentOnCloseNearMe by rememberUpdatedState(onCloseNearMe)
 
-    // Location permission, asked only when "my location" is tapped (approximate only).
+    // Location permission, asked only when "my location" is tapped. Approximate
+    // and precise together: on Android 12+ the user picks, approximate is enough.
     val context = LocalContext.current
     val activity = LocalActivity.current
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it }) {
             onLocate()
         } else {
             val willAskAgain = activity != null &&
@@ -129,9 +134,10 @@ fun MapScreen(
         }
     }
     val requestLocation = {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-        if (granted) onLocate() else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        val granted = LOCATION_PERMISSIONS.any {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (granted) onLocate() else permissionLauncher.launch(LOCATION_PERMISSIONS)
     }
 
     val details = remember(state.snapshot, selectedStationId) {
@@ -189,18 +195,36 @@ fun MapScreen(
     // Height of the controls over the top of the map (fuel chips, status card).
     var topControlsPx by remember { mutableIntStateOf(0) }
 
+    // The "near me" list: recomputed when the position, radius, order, fuel or data change (~ms).
+    val nearby = remember(nearMe.position, nearMe.settings, state.ranking, state.snapshot) {
+        val position = nearMe.position
+        val snapshot = state.snapshot
+        if (position == null || snapshot == null) {
+            emptyList()
+        } else {
+            Nearby.find(snapshot.stations.stations, state.ranking, position.lat, position.lon, nearMe.settings.radiusKm, nearMe.settings.sort)
+        }
+    }
+
     // A new position: fit the search circle between the top controls and the sheet.
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
-    LaunchedEffect(nearMe.fixCount) {
+    val radiusKm = nearMe.settings.radiusKm
+    // Collapsed height of the "near me" list, once measured: the part of the map it covers.
+    var nearbyHeaderPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(nearMe.fixCount, radiusKm, nearbyHeaderPx > 0) {
         val position = nearMe.position ?: return@LaunchedEffect
         cameraCommand = CameraCommand(
-            id = nearMe.fixCount,
+            id = (cameraCommand?.id ?: 0) + 1,
             move = CameraMove.FitCircle(
                 position.lat,
                 position.lon,
-                NEAR_ME_RADIUS_KM,
+                radiusKm.toDouble(),
                 topPx = topControlsPx,
-                bottomPx = (mapHeightPx * SHEET_SHARE).roundToInt(),
+                bottomPx = if (nearbyHeaderPx > 0) {
+                    handleHeightPx + nearbyHeaderPx + navBarPx
+                } else {
+                    (mapHeightPx * SHEET_SHARE).roundToInt()
+                },
             ),
         )
     }
@@ -224,6 +248,33 @@ fun MapScreen(
                         modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
                     )
                     StationSheetBody(station, state.choice)
+                } else if (nearMe.open && nearMe.status == NearMeStatus.Located && state.snapshot != null) {
+                    NearbyList(
+                        state = nearMe,
+                        choice = state.choice,
+                        stations = nearby,
+                        brands = state.snapshot.stations.brands,
+                        onRadiusChange = onRadiusChange,
+                        onSortChange = onSortChange,
+                        onStationClick = { item ->
+                            onStationClick(item.station.id)
+                            // Bring it into the free part of the map, zoomed in enough to show it alone.
+                            cameraCommand = CameraCommand(
+                                id = (cameraCommand?.id ?: 0) + 1,
+                                move = CameraMove.Show(
+                                    item.station.lat,
+                                    item.station.lon,
+                                    minZoom = STATION_ZOOM,
+                                    topPx = topControlsPx,
+                                    bottomPx = (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt(),
+                                ),
+                            )
+                        },
+                        headerModifier = Modifier.onSizeChanged { size ->
+                            headerHeightPx = size.height
+                            nearbyHeaderPx = size.height
+                        },
+                    )
                 } else if (nearMe.open) {
                     NearMeStatusPanel(
                         state = nearMe,
@@ -275,7 +326,7 @@ fun MapScreen(
                 selectedStationId = selectedStationId,
                 onStationClick = onStationClick,
                 userPosition = nearMe.position,
-                searchRadiusKm = NEAR_ME_RADIUS_KM.takeIf { nearMe.open },
+                searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },
                 locationColor = MaterialTheme.colorScheme.primary.toArgb(),
                 cameraCommand = cameraCommand,
                 modifier = Modifier.fillMaxSize(),
@@ -326,10 +377,12 @@ private fun MapAttributionBar(onClick: () -> Unit, modifier: Modifier = Modifier
     }
 }
 
-/** "Near me" search radius. */
-private const val NEAR_ME_RADIUS_KM = 10.0
+private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
 
-/** Share of the map's height the sheet covers when it opens, kept clear when fitting the camera. */
+/** Zoom at which stations show one by one (clusters end at 13). */
+private const val STATION_ZOOM = 14.0
+
+/** Share of the map's height the sheet is assumed to cover before the list is measured. */
 private const val SHEET_SHARE = 0.4f
 
 /** Map label texts in the app language (see [MapLabels]). */

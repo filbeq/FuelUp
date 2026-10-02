@@ -3,15 +3,21 @@ package io.github.filbeq.fuelup.ui.map
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.filbeq.fuelup.data.AppSettingsStore
 import io.github.filbeq.fuelup.data.LocateResult
+import io.github.filbeq.fuelup.data.NearbySettings
+import io.github.filbeq.fuelup.data.NearbySettingsStore
+import io.github.filbeq.fuelup.data.NearbySort
 import io.github.filbeq.fuelup.data.UserLocator
 import io.github.filbeq.fuelup.data.UserPosition
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Where "near me" is at. */
 enum class NearMeStatus {
@@ -34,6 +40,8 @@ data class NearMeState(
     val position: UserPosition? = null,
     /** Bumped on every new position, so the camera re-centres even if the position is the same. */
     val fixCount: Long = 0,
+    /** List radius and order; remembered across launches. */
+    val settings: NearbySettings = NearbySettings(),
 )
 
 /**
@@ -42,9 +50,28 @@ data class NearMeState(
  */
 class NearMeViewModel(application: Application) : AndroidViewModel(application) {
     private val locator = UserLocator(application)
+    private val settingsStore by lazy {
+        NearbySettingsStore(application.getSharedPreferences(AppSettingsStore.PREFS_NAME, Application.MODE_PRIVATE))
+    }
     private val _state = MutableStateFlow(NearMeState())
     val state: StateFlow<NearMeState> = _state.asStateFlow()
     private var locateJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) { settingsStore.load() }
+            _state.update { it.copy(settings = saved) }
+        }
+    }
+
+    fun setRadius(radiusKm: Int) = updateSettings(_state.value.settings.copy(radiusKm = radiusKm))
+
+    fun setSort(sort: NearbySort) = updateSettings(_state.value.settings.copy(sort = sort))
+
+    private fun updateSettings(settings: NearbySettings) {
+        _state.update { it.copy(settings = settings) }
+        viewModelScope.launch(Dispatchers.IO) { settingsStore.save(settings) }
+    }
 
     /** "My location" tapped: open the panel; the screen then asks for the permission if needed. */
     fun open() = _state.update { it.copy(open = true, status = NearMeStatus.Locating) }

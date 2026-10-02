@@ -75,6 +75,8 @@ fun FuelUpApp(
                     onLocate = nearMeViewModel::locate,
                     onLocationDenied = nearMeViewModel::denied,
                     onCloseNearMe = nearMeViewModel::close,
+                    onRadiusChange = nearMeViewModel::setRadius,
+                    onSortChange = nearMeViewModel::setSort,
                 )
             }
             entry<SettingsRoute> {

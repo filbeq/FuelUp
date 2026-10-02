@@ -114,13 +114,7 @@ fun StationSheetHeader(
 /** The chosen fuel's price, its class icon and the comparison in words. */
 @Composable
 private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?) {
-    val choiceLabel = buildString {
-        append(stringResource(fuelLabel(choice.fuel)))
-        if (choice.modeApplies) {
-            append(" · ")
-            append(stringResource(if (choice.mode == ServiceMode.SELF) R.string.mode_self else R.string.mode_served))
-        }
-    }
+    val choiceLabel = choiceLabel(choice)
     if (ranked == null) {
         Text(
             stringResource(R.string.station_does_not_sell, choiceLabel),
@@ -152,6 +146,16 @@ private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/** "Gasolio · Self", or just "GPL" where self/served doesn't apply. */
+@Composable
+internal fun choiceLabel(choice: FuelChoice): String = buildString {
+    append(stringResource(fuelLabel(choice.fuel)))
+    if (choice.modeApplies) {
+        append(" · ")
+        append(stringResource(if (choice.mode == ServiceMode.SELF) R.string.mode_self else R.string.mode_served))
+    }
 }
 
 /** "4,5 cent sotto il prezzo tipico della zona", "In linea con…", "Prezzo da verificare…". */
@@ -293,7 +297,7 @@ private fun PriceCell(price: PriceInfo?, perKg: Boolean, now: Instant, modifier:
 }
 
 @Composable
-private fun reportedText(price: PriceInfo, now: Instant): String {
+internal fun reportedText(price: PriceInfo, now: Instant): String {
     val days = daysSinceReported(price.updated, now).toInt()
     return when (days) {
         0 -> stringResource(R.string.reported_today)
@@ -304,7 +308,7 @@ private fun reportedText(price: PriceInfo, now: Instant): String {
 
 /** "1,849 €/l" (Italian) or "€1.849/l" (English); per kg for methane and LNG. */
 @Composable
-private fun formatPrice(price: PriceInfo, perKg: Boolean): String {
+internal fun formatPrice(price: PriceInfo, perKg: Boolean): String {
     val number = formatPriceNumber(price.priceMilli, LocalConfiguration.current.locales[0])
     return stringResource(if (perKg) R.string.price_per_kg else R.string.price_per_litre, number)
 }
