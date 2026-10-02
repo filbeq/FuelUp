@@ -247,8 +247,9 @@ small enough to be tested on a real phone before moving on.
     allowed), 20 s timeout, recent last-known fix used first. Kept in memory
     only; never saved or sent.
   - Drawn honestly: a translucent disc of the reported accuracy plus a small
-    centre mark (no precise-looking dot); the search radius as a dashed
-    circle; the camera fits it between the top controls and the sheet.
+    centre mark (no precise-looking dot); the search radius as a
+    circle (solid line on a soft halo); the camera fits it between the top
+    controls and the sheet.
     Colours follow the map's darkness (`LocationColor*`, like the clusters),
     every line has a halo in the opposite tone. Disc and circle lie under the
     stations; the centre mark is a symbol above them, so colliding price
@@ -263,7 +264,8 @@ small enough to be tested on a real phone before moving on.
     Only the header (title, sort, radius) is fixed; all rows scroll in one
     list, back at the top when the sheet collapses.
   - Empty-map tap: with a station selected, leaves it (back to the list as
-    it was, or nothing); otherwise lowers the list to its title row (kept,
+    it was, or nothing); otherwise lowers the list to its header: title,
+    order and radius (kept,
     so the circle on the map stays explained). Title, drag up or the
     location button bring it back. Back: station → list → collapsed → closed;
     minimised → closed.
