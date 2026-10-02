@@ -120,8 +120,11 @@ small enough to be tested on a real phone before moving on.
   `AboutRoute`) in `ui/FuelUpApp.kt`; system Back pops it. The map's ViewModel,
   camera and selected station live above the navigation, so they survive other
   screens. The station sheet is part of the map screen and gets Back first.
-- Settings (step 6b): gear icon top right → Settings (theme system/light/dark,
-  map style automatic/light/dark, language system/Italiano/English) → About.
+- Settings (step 6b, controls 6c): gear icon top right → Settings → About.
+  Theme: switch "follow system theme" + "dark theme" (enabled only when the
+  first is off); map style: "automatic map style" + "dark map", same pattern.
+  Turning an automatic switch off keeps what is on screen (no flip). Language:
+  dropdown (system / Italiano / English).
   Theme and map style saved in SharedPreferences (`AppSettingsStore`, same file
   as the fuel choice); the saved theme is applied before the first frame.
 - AppCompat (step 6b): `MainActivity` is an `AppCompatActivity` with an
@@ -145,9 +148,25 @@ small enough to be tested on a real phone before moving on.
   fuel in `PriceRanking.THRESHOLDS`. Colours never depend on the visible area.
 - Colour-blind safety: every class has a distinct marker shape and the sheet
   says it in words; colour is never the only signal.
+- Clusters (step 6c): radius by station count 9/12/16/21/27 dp (2–9, 10–49,
+  50–199, 200–999, 1000+), 30% fill with a solid 2 dp outline, label with a
+  halo, grouping radius 40 px (constants in `StationLayers`). Cluster colour is
+  its own pair (`ClusterColorLight` dark blue on the light map,
+  `ClusterColorDark` pale blue on the dark map): it follows the map's darkness,
+  not the app theme. On the dark map its colour is only moderately different
+  from the grey "average" marker (ΔE ≈ 11); the form (translucent ring + "da"
+  label vs small solid disc) keeps them apart.
 - Debug builds are arm64-only to keep installs small; release keeps all ABIs.
 - Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
   (system default unless chosen in Settings); no dynamic colour.
+- Palette (step 6c): "Ink blue", Material 3 schemes generated from seed
+  `#2F5DA8` (Google's Material colour algorithm; secondary/tertiary in the same
+  blue family). Rule: **UI colours never green and never orange/red**, so they
+  can't be confused with the price colours. Chosen over violet and graphite
+  after on-phone screenshots; checked: WCAG AA text contrast (6.2:1 or more) and
+  ΔE2000 ≥ 20 from the price colours under normal vision and simulated
+  protan/deutan/tritan vision. Palette in `ui/theme/Color.kt`, mirrored in
+  `res/values*/colors.xml` (window background, launcher icon `brand`).
 - Maps: MapLibre Native for Android (`org.maplibre.gl:android-sdk`) wrapped in
   Compose with `AndroidView` around `MapView`, kept in a single file. Chosen
   over the `maplibre-compose` wrapper, which is pre-1.0 with frequent breaking
@@ -215,6 +234,8 @@ small enough to be tested on a real phone before moving on.
 6. Fuel filter + marker colors by relative price (cheap → expensive).
 6b. Settings screen (theme, map style, language incl. Android < 13) and a
    readable dark map style (fiord); Navigation 3 for map, settings and About.
+6c. UI fixes: settings switches + language dropdown, smaller translucent
+   clusters sized by count, "Ink blue" palette (no green/orange/red in the UI).
 7. "Near me" with location permission.
 8. Later: favorites, search, price history, UI polish, Play Store prep.
    Note: the map view is rebuilt (~1 s style reload) when returning from
