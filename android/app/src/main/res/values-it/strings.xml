@@ -96,4 +96,14 @@
     <string name="settings_map_style">Stile della mappa</string>
     <string name="settings_language">Lingua</string>
     <string name="language_system">Predefinita di sistema</string>
+    <string name="action_my_location">La mia posizione</string>
+    <string name="action_open_app_settings">Apri impostazioni</string>
+    <string name="action_location_settings">Impostazioni di localizzazione</string>
+    <string name="near_me_title">Vicino a te</string>
+    <string name="near_me_locating">Ricerca della posizione approssimativa…</string>
+    <string name="near_me_located">La tua posizione approssimativa (± %1$s)</string>
+    <string name="near_me_denied">FuelUp usa la tua posizione approssimativa solo per mostrarti i distributori vicini, e solo quando lo chiedi. Non lascia mai il telefono. La mappa funziona anche senza.</string>
+    <string name="near_me_denied_permanently">L\'accesso alla posizione è disattivato per FuelUp. Per vedere i distributori vicini, consenti la posizione approssimativa nelle impostazioni dell\'app. La mappa funziona anche senza.</string>
+    <string name="near_me_location_off">La localizzazione è disattivata sul telefono. Attivala per vedere i distributori vicini.</string>
+    <string name="near_me_unavailable">Non è stato possibile trovare la tua posizione. Riprova tra poco, magari con il Wi-Fi attivo.</string>
 </resources>

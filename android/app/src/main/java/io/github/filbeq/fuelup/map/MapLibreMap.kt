@@ -1,14 +1,15 @@
 package io.github.filbeq.fuelup.map
 
+import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -16,8 +17,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.filbeq.fuelup.data.Geo
+import io.github.filbeq.fuelup.data.UserPosition
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -33,6 +39,23 @@ data class MapCamera(val latitude: Double, val longitude: Double, val zoom: Doub
             restore = { MapCamera(it[0], it[1], it[2]) },
         )
     }
+}
+
+/**
+ * A one-off camera move asked for by the screen. [id] tells two identical
+ * requests apart (e.g. tapping "my location" twice).
+ */
+data class CameraCommand(val id: Long, val move: CameraMove)
+
+sealed interface CameraMove {
+    /**
+     * Show the whole circle of [radiusKm] around a point, keeping clear of the
+     * controls on top and the sheet at the bottom ([topPx], [bottomPx]).
+     */
+    data class FitCircle(val lat: Double, val lon: Double, val radiusKm: Double, val topPx: Int, val bottomPx: Int) : CameraMove
+
+    /** Centre a point in the free area between [topPx] and [bottomPx], zoomed in to at least [minZoom]. */
+    data class Show(val lat: Double, val lon: Double, val minZoom: Double, val topPx: Int, val bottomPx: Int) : CameraMove
 }
 
 /**
@@ -59,6 +82,14 @@ fun MapLibreMap(
     selectedStationId: Int?,
     /** Called with the id of a tapped station. Taps on clusters zoom in. */
     onStationClick: (Int) -> Unit,
+    /** The user's position (null = unknown or not asked), see [UserLocationLayers]. */
+    userPosition: UserPosition?,
+    /** "Near me" search circle around [userPosition], or null. */
+    searchRadiusKm: Double?,
+    /** Colour (ARGB) of the user's position and the search circle. */
+    locationColor: Int,
+    /** Latest camera move asked for, or null. */
+    cameraCommand: CameraCommand?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -66,6 +97,7 @@ fun MapLibreMap(
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     val currentColors = rememberUpdatedState(stationColors)
     val currentOnStationClick = rememberUpdatedState(onStationClick)
+    val currentLocationColor = rememberUpdatedState(locationColor)
     // The style currently on screen, once fully loaded (null while loading).
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember {
@@ -104,6 +136,8 @@ fun MapLibreMap(
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                 LabelLanguage.apply(style, labelLanguage)
+                // Added first, so it lies under the stations.
+                UserLocationLayers.addTo(style, currentLocationColor.value)
                 // A new style starts empty: add our source and layers every time.
                 StationLayers.addTo(style, currentColors.value, labelFont, density, mapLabels)
                 loadedStyle = style
@@ -117,6 +151,15 @@ fun MapLibreMap(
 
     LaunchedEffect(loadedStyle, selectedStationId) {
         loadedStyle?.let { StationLayers.setSelected(it, selectedStationId) }
+    }
+
+    LaunchedEffect(loadedStyle, userPosition, searchRadiusKm) {
+        loadedStyle?.let { UserLocationLayers.setData(it, userPosition, searchRadiusKm) }
+    }
+
+    LaunchedEffect(cameraCommand) {
+        val move = cameraCommand?.move ?: return@LaunchedEffect
+        mapView.getMapAsync { map -> moveCamera(map, move) }
     }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -144,4 +187,27 @@ fun MapLibreMap(
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
+}
+
+private fun moveCamera(map: MapLibreMap, move: CameraMove) {
+    when (move) {
+        is CameraMove.FitCircle -> {
+            val bounds = LatLngBounds.Builder()
+                .includes(Geo.circle(move.lat, move.lon, move.radiusKm, points = 16).map { LatLng(it[1], it[0]) })
+                .build()
+            val side = (16 * Resources.getSystem().displayMetrics.density).toInt()
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, side, move.topPx + side, side, move.bottomPx + side))
+        }
+        is CameraMove.Show -> {
+            val zoom = maxOf(map.cameraPosition.zoom, move.minZoom)
+            // Centre the point, then shift it to the middle of the free area.
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(LatLng(move.lat, move.lon), zoom),
+                object : MapLibreMap.CancelableCallback {
+                    override fun onFinish() = map.scrollBy(0f, (move.bottomPx - move.topPx) / 2f, 150)
+                    override fun onCancel() = Unit
+                },
+            )
+        }
+    }
 }

@@ -1,6 +1,11 @@
 package io.github.filbeq.fuelup.ui.map
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -18,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,15 +48,20 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
 import io.github.filbeq.fuelup.data.isDark
+import io.github.filbeq.fuelup.map.CameraCommand
+import io.github.filbeq.fuelup.map.CameraMove
 import io.github.filbeq.fuelup.map.CurrentMapProvider
 import io.github.filbeq.fuelup.map.LabelLanguage
 import io.github.filbeq.fuelup.map.MapCamera
@@ -58,14 +69,14 @@ import io.github.filbeq.fuelup.map.MapLabels
 import io.github.filbeq.fuelup.map.MapLibreMap
 import io.github.filbeq.fuelup.map.StationColors
 import io.github.filbeq.fuelup.map.styleUrl
-import io.github.filbeq.fuelup.ui.theme.ClusterColorDark
-import io.github.filbeq.fuelup.ui.theme.ClusterColorLight
 import io.github.filbeq.fuelup.ui.station.StationDetails
 import io.github.filbeq.fuelup.ui.station.StationSheetBody
 import io.github.filbeq.fuelup.ui.station.StationSheetHeader
 import io.github.filbeq.fuelup.ui.station.stationDetails
-import kotlinx.coroutines.launch
+import io.github.filbeq.fuelup.ui.theme.ClusterColorDark
+import io.github.filbeq.fuelup.ui.theme.ClusterColorLight
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /**
  * The map with a non-modal station sheet. The map stays interactive while the
@@ -86,6 +97,14 @@ fun MapScreen(
     onDismissStation: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
+    nearMe: NearMeState,
+    /** "My location" tapped (before any permission question). */
+    onOpenNearMe: () -> Unit,
+    /** Permission granted: find the position. */
+    onLocate: () -> Unit,
+    /** Permission refused; true if the system won't ask again. */
+    onLocationDenied: (Boolean) -> Unit,
+    onCloseNearMe: () -> Unit,
 ) {
     val provider = CurrentMapProvider
     val scope = rememberCoroutineScope()
@@ -95,6 +114,25 @@ fun MapScreen(
     val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Hidden, skipHiddenState = false)
     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val currentOnDismiss by rememberUpdatedState(onDismissStation)
+    val currentOnCloseNearMe by rememberUpdatedState(onCloseNearMe)
+
+    // Location permission, asked only when "my location" is tapped (approximate only).
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            onLocate()
+        } else {
+            val willAskAgain = activity != null &&
+                ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)
+            onLocationDenied(!willAskAgain)
+        }
+    }
+    val requestLocation = {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) onLocate() else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
 
     val details = remember(state.snapshot, selectedStationId) {
         selectedStationId?.let { id -> state.snapshot?.stationDetails(id) }
@@ -103,19 +141,23 @@ fun MapScreen(
     var shownDetails by remember { mutableStateOf<StationDetails?>(null) }
     if (details != null) shownDetails = details
 
-    // Selection drives the sheet: a selected station shows it (collapsed), none hides it.
-    LaunchedEffect(selectedStationId) {
-        if (selectedStationId != null) {
+    // The sheet shows the selected station, else the "near me" panel; with neither, it hides.
+    val sheetWanted = selectedStationId != null || nearMe.open
+    LaunchedEffect(sheetWanted) {
+        if (sheetWanted) {
             if (sheetState.currentValue == SheetValue.Hidden) sheetState.partialExpand()
         } else if (sheetState.currentValue != SheetValue.Hidden) {
             sheetState.hide()
         }
     }
-    // Swiping the sheet away deselects the station.
+    // Swiping the sheet away deselects the station and closes "near me".
     LaunchedEffect(sheetState) {
         var previous = sheetState.currentValue
         snapshotFlow { sheetState.currentValue }.collect { value ->
-            if (value == SheetValue.Hidden && previous != SheetValue.Hidden) currentOnDismiss()
+            if (value == SheetValue.Hidden && previous != SheetValue.Hidden) {
+                currentOnDismiss()
+                currentOnCloseNearMe()
+            }
             previous = value
         }
     }
@@ -123,10 +165,14 @@ fun MapScreen(
     LaunchedEffect(details, state.snapshot) {
         if (selectedStationId != null && state.snapshot != null && details == null) currentOnDismiss()
     }
-    // Back: expanded → collapsed → closed.
-    BackHandler(enabled = selectedStationId != null) {
+    // Back: expanded → collapsed → closed; a station opened from "near me" goes back to it.
+    BackHandler(enabled = sheetWanted) {
         scope.launch {
-            if (sheetState.currentValue == SheetValue.Expanded) sheetState.partialExpand() else onDismissStation()
+            when {
+                sheetState.currentValue == SheetValue.Expanded -> sheetState.partialExpand()
+                selectedStationId != null -> onDismissStation()
+                else -> onCloseNearMe()
+            }
         }
     }
 
@@ -139,6 +185,25 @@ fun MapScreen(
     // Where the sheet's top edge is, so the map credits can stay above it.
     var sheetTopPx by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     var mapBottomPx by remember { mutableFloatStateOf(0f) }
+    var mapHeightPx by remember { mutableIntStateOf(0) }
+    // Height of the controls over the top of the map (fuel chips, status card).
+    var topControlsPx by remember { mutableIntStateOf(0) }
+
+    // A new position: fit the search circle between the top controls and the sheet.
+    var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
+    LaunchedEffect(nearMe.fixCount) {
+        val position = nearMe.position ?: return@LaunchedEffect
+        cameraCommand = CameraCommand(
+            id = nearMe.fixCount,
+            move = CameraMove.FitCircle(
+                position.lat,
+                position.lon,
+                NEAR_ME_RADIUS_KM,
+                topPx = topControlsPx,
+                bottomPx = (mapHeightPx * SHEET_SHARE).roundToInt(),
+            ),
+        )
+    }
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
@@ -148,15 +213,23 @@ fun MapScreen(
         },
         sheetContent = {
             Column(Modifier.fillMaxWidth().onGloballyPositioned { sheetTopPx = it.positionInWindow().y - handleHeightPx }) {
-                shownDetails?.let {
+                val station = shownDetails
+                // The station has priority; while the sheet slides away, the last content stays.
+                if (station != null && (selectedStationId != null || !nearMe.open)) {
                     StationSheetHeader(
-                        details = it,
+                        details = station,
                         choice = state.choice,
-                        ranked = state.ranking[it.id],
+                        ranked = state.ranking[station.id],
                         onOpenStation = onStationClick,
                         modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
                     )
-                    StationSheetBody(it, state.choice)
+                    StationSheetBody(station, state.choice)
+                } else if (nearMe.open) {
+                    NearMeStatusPanel(
+                        state = nearMe,
+                        onTryAgain = requestLocation,
+                        modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
+                    )
                 }
             }
         },
@@ -179,7 +252,10 @@ fun MapScreen(
                 .fillMaxSize()
                 // Top bar only: the sheet floats over the map, which stays full height.
                 .padding(top = padding.calculateTopPadding())
-                .onGloballyPositioned { mapBottomPx = it.boundsInWindow().bottom },
+                .onGloballyPositioned {
+                    mapBottomPx = it.boundsInWindow().bottom
+                    mapHeightPx = it.size.height
+                },
         ) {
             MapLibreMap(
                 styleUrl = provider.styleUrl(mapStyle, darkTheme = isSystemInDarkTheme()),
@@ -198,19 +274,32 @@ fun MapScreen(
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
                 selectedStationId = selectedStationId,
                 onStationClick = onStationClick,
+                userPosition = nearMe.position,
+                searchRadiusKm = NEAR_ME_RADIUS_KM.takeIf { nearMe.open },
+                locationColor = MaterialTheme.colorScheme.primary.toArgb(),
+                cameraCommand = cameraCommand,
                 modifier = Modifier.fillMaxSize(),
             )
-            Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.align(Alignment.TopCenter).onSizeChanged { topControlsPx = it.height },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 FuelSelector(choice = state.choice, onChoiceChange = onChoiceChange)
                 DataStatusCard(state = state, onRetry = onRetry)
             }
-            MapAttributionBar(
-                onClick = onOpenAbout,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    // Lift the credits above the sheet so they're never covered.
-                    .offset { IntOffset(0, -(mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt()) },
-            )
+            // Lift the credits and the button above the sheet so they're never covered.
+            val aboveSheet = Modifier.offset { IntOffset(0, -(mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt()) }
+            MapAttributionBar(onClick = onOpenAbout, modifier = Modifier.align(Alignment.BottomStart).then(aboveSheet))
+            SmallFloatingActionButton(
+                onClick = {
+                    onOpenNearMe()
+                    requestLocation()
+                },
+                // Above the credits line, at the right edge.
+                modifier = Modifier.align(Alignment.BottomEnd).then(aboveSheet).padding(end = 12.dp, bottom = 40.dp),
+            ) {
+                Icon(painterResource(R.drawable.ic_my_location), contentDescription = stringResource(R.string.action_my_location))
+            }
         }
     }
 }
@@ -236,6 +325,12 @@ private fun MapAttributionBar(onClick: () -> Unit, modifier: Modifier = Modifier
         )
     }
 }
+
+/** "Near me" search radius. */
+private const val NEAR_ME_RADIUS_KM = 10.0
+
+/** Share of the map's height the sheet covers when it opens, kept clear when fitting the camera. */
+private const val SHEET_SHARE = 0.4f
 
 /** Map label texts in the app language (see [MapLabels]). */
 @Composable

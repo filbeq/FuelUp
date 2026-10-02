@@ -108,4 +108,14 @@
     <!-- Each language name is written in its own language. -->
     <string name="language_italian" translatable="false">Italiano</string>
     <string name="language_english" translatable="false">English</string>
+    <string name="action_my_location">My location</string>
+    <string name="action_open_app_settings">Open settings</string>
+    <string name="action_location_settings">Location settings</string>
+    <string name="near_me_title">Near you</string>
+    <string name="near_me_locating">Finding your approximate position…</string>
+    <string name="near_me_located">Your approximate position (± %1$s)</string>
+    <string name="near_me_denied">FuelUp uses your approximate position only to show the stations near you, and only when you ask. It never leaves your phone. The map works without it.</string>
+    <string name="near_me_denied_permanently">Location access is turned off for FuelUp. To see the stations near you, allow approximate location in the app\'s settings. The map works without it.</string>
+    <string name="near_me_location_off">Location is turned off on this phone. Turn it on to see the stations near you.</string>
+    <string name="near_me_unavailable">Your position couldn\'t be found right now. Try again in a moment, perhaps with Wi-Fi on.</string>
 </resources>

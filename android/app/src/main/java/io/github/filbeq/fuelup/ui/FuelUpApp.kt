@@ -15,6 +15,7 @@ import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.ui.about.AboutScreen
 import io.github.filbeq.fuelup.ui.map.MapScreen
 import io.github.filbeq.fuelup.ui.map.MapViewModel
+import io.github.filbeq.fuelup.ui.map.NearMeViewModel
 import io.github.filbeq.fuelup.ui.settings.SettingsScreen
 import io.github.filbeq.fuelup.ui.settings.SettingsViewModel
 import kotlinx.serialization.Serializable
@@ -40,9 +41,11 @@ data object AboutRoute : NavKey
 fun FuelUpApp(
     mapViewModel: MapViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel(),
+    nearMeViewModel: NearMeViewModel = viewModel(),
 ) {
     val mapState by mapViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    val nearMe by nearMeViewModel.state.collectAsStateWithLifecycle()
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
     var selectedStationId by rememberSaveable { mutableStateOf<Int?>(null) }
     val backStack = rememberNavBackStack(MapRoute)
@@ -64,6 +67,14 @@ fun FuelUpApp(
                     onDismissStation = { selectedStationId = null },
                     onOpenSettings = { backStack.add(SettingsRoute) },
                     onOpenAbout = { backStack.add(AboutRoute) },
+                    nearMe = nearMe,
+                    onOpenNearMe = {
+                        selectedStationId = null
+                        nearMeViewModel.open()
+                    },
+                    onLocate = nearMeViewModel::locate,
+                    onLocationDenied = nearMeViewModel::denied,
+                    onCloseNearMe = nearMeViewModel::close,
                 )
             }
             entry<SettingsRoute> {
