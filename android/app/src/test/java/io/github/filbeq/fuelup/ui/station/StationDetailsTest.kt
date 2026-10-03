@@ -30,7 +30,7 @@ class StationDetailsTest {
         assertEquals("PO EST", details.displayName)
         assertEquals("Api-Ip", details.brand)
         assertTrue(details.motorway)
-        assertEquals("FERRARA", details.municipality)
+        assertEquals("Ferrara", details.municipality)
         assertEquals("FE", details.province)
         assertEquals(listOf("Benzina", "Gasolio", "GPL", "Metano"), details.rows.map { it.name })
 

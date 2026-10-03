@@ -2,6 +2,7 @@ package io.github.filbeq.fuelup.ui.station
 
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
+import io.github.filbeq.fuelup.data.PlaceNames
 import io.github.filbeq.fuelup.data.PriceEntry
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
@@ -107,7 +108,7 @@ private fun Station.toDetails(file: StationsFile): StationDetails {
         brand = file.brands.getOrElse(brand) { "" },
         motorway = motorway == 1,
         address = address,
-        municipality = municipality,
+        municipality = PlaceNames.municipality(municipality),
         province = province,
         lat = lat,
         lon = lon,
