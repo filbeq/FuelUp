@@ -2,11 +2,12 @@ name: Publish fuel data
 
 on:
   schedule:
-    # MIMIT publishes the new files around 06:45 UTC. The afternoon run catches
-    # late publications. GitHub may start scheduled runs a few minutes late.
-    - cron: "30 7 * * *"
-    - cron: "30 15 * * *"
-  workflow_dispatch: # "Run workflow" button in the Actions tab
+    # MIMIT publishes the new files around 06:45 UTC. GitHub starts scheduled
+    # runs late (hours, on 2 Oct 2026) or drops them, so run every 2 hours,
+    # 07:10-21:10 UTC, off the hour (the scheduler's busiest time). Runs with
+    # nothing new stop after the "check" job, in about 20 seconds.
+    - cron: "10 7-21/2 * * *"
+  workflow_dispatch: # "Run workflow" button in the Actions tab: always publishes
 
 permissions:
   contents: read
@@ -17,7 +18,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Does MIMIT have a newer date than the published data? If a source can't be
+  # read, the answer is "yes" and the build decides.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      needed: ${{ steps.freshness.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - id: freshness
+        working-directory: pipeline
+        run: python -m fuel_pipeline.freshness needs-publish
+
   build:
+    needs: check
+    # A manual run always publishes (e.g. to republish a fix for the same date).
+    if: needs.check.outputs.needed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
