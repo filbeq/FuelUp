@@ -145,7 +145,7 @@ small enough to be tested on a real phone before moving on.
   The MapView is **not** paused while covered: MapLibre draws only on change
   (CPU ~0% behind Settings), and pausing it flashed dark on Back after the app
   had been in the background (seen in a screen recording).
-- Settings (step 6b, controls 6c): gear icon top right → Settings → About.
+- Settings (step 6b, controls 6c): gear button top right → Settings → About.
   Theme: switch "follow system theme" + "dark theme" (enabled only when the
   first is off); map style: "automatic map style" + "dark map", same pattern.
   Turning an automatic switch off keeps what is on screen (no flip). Language:
@@ -177,6 +177,23 @@ small enough to be tested on a real phone before moving on.
   `Show` sets its padding explicitly), and `scrollBy` doesn't end in a
   camera-idle event (the camera saved for rotation misses it): use
   `animateCamera`.
+- Full-screen map (step 8.4): no top bar on the map screen (Settings and About
+  keep theirs, with Back); the map runs edge to edge under the status bar.
+  Top controls (`ui/map/MapTopControls.kt`), all 48 dp tall: date pill, fuel
+  button, round gear button. One row when they fit in the width beside the
+  panel's place (landscape phone, tablet; measured, not a fixed width, so the
+  panel's slide never rearranges them), pill centred as far as the buttons
+  allow; else pill centred with the gear on its right and the fuel button
+  under the gear (portrait). Status bar: icons follow the map's darkness (app
+  theme while Settings/About is on top) over a faint scrim in the map's tone;
+  icon colour alone was tried, place names clashed with the clock. Insets:
+  controls and side panel use `safeDrawing` (status bar, cutout, side
+  navigation bar); the expanded sheet stops 8 dp below the status bar; a tall
+  sheet covers the credits and location button instead of lifting them into
+  the controls. Camera moves take `topControlsPx` (status bar included);
+  `Reveal` also moves a tapped station down out from under the controls.
+  A plain `Box` replaced the wide layout's `Scaffold`: Material text colour
+  must then be set explicitly on translucent surfaces (`contentColor`).
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
@@ -186,7 +203,7 @@ small enough to be tested on a real phone before moving on.
   and diesel (LPG/methane/LNG are ~90–97% served-only); stations not selling the
   choice are hidden (not greyed); choice saved in SharedPreferences.
 - Fuel selector (step 8.2): one floating button on the right of the map, under
-  the data-date pill (like Google Maps' map-type button), always showing the
+  the gear or beside it (step 8.4; like Google Maps' map-type button), always showing the
   current choice ("Gasolio · Self"). It opens a modal bottom sheet: fuel chips,
   Self/Servito, and the price legend with a meaning per class (incl. "not
   compared"). The mode row keeps its height for LPG/CNG/LNG (a note instead),
@@ -345,6 +362,9 @@ personal use on the test phone. Done in step 8 so far:
 - 8.3: side panel on wide windows (landscape phones, tablets), see "Wide
   layout" above; checked on the phone and a Pixel Tablet emulator, incl.
   screenrecord of panel open/close and rotations.
+- 8.4: full-screen map, floating gear, status bar icons + scrim following the
+  map, see "Full-screen map" above; checked on the phone (light/dark map,
+  portrait/landscape, screenrecords) and the tablet emulator.
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
@@ -364,8 +384,6 @@ Next: the rest of step 8 (see the backlog below).
 
 ### Backlog for step 8 (in no particular order)
 
-- **Top bar in landscape** takes ~20% of the height; dropping it there (gear
-  as a floating button, like Google Maps) would show about one more list row.
 - **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
   GeoJSON, style load) and trim.
 - **Search by name** (station name, brand, municipality).

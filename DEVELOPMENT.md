@@ -151,7 +151,7 @@ If `adb devices` shows nothing although the cable is connected: unlock the
 phone, look for the "Allow USB debugging?" prompt, or turn USB debugging off
 and on again.
 
-**Testing languages:** in the app, gear icon → Settings → Language (works on
+**Testing languages:** in the app, gear button → Settings → Language (works on
 every Android version). On Android 13+ the same choice also appears in the
 system's Settings → Apps → FuelUp → Language.
 
@@ -164,7 +164,8 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices, "Update data now"; link to About |
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
-| `java/…/ui/map/MapScreen.kt` | Top bar, map, station sheet (non-modal) or side panel on wide windows, credits that follow them |
+| `java/…/ui/map/MapScreen.kt` | Full-screen map, station sheet (non-modal) or side panel on wide windows, credits that follow them, status bar icons |
+| `java/…/ui/map/MapTopControls.kt` | Date pill, fuel button and settings button over the top of the map (one row or two) |
 | `java/…/ui/map/SidePanel.kt` | The side panel (station details, "near me" list) on wide windows |
 | `java/…/ui/WindowSize.kt` | Wide-window test (Material window size classes) and the 600 dp content width for Settings/About |
 | `java/…/map/MapLibreMap.kt` | MapLibre `MapView` inside Compose (all MapLibre glue) |
@@ -375,8 +376,8 @@ the station details and the "near me" list move from the bottom sheet to a
   from the list is centred in the free part of the map, and a station tapped
   where the panel opens is panned just enough to stay visible.
 - **Overlays:** the credits line moves to the right of the open panel and the
-  date pill centres in the free part of the map; the fuel button and the
-  my-location button stay on the right.
+  date pill centres in the free part of the map; the fuel button, the gear and
+  the my-location button stay on the right.
 - **Rotation** keeps the content (station or list, minimised or not) and the
   scroll position. The sheet comes back collapsed or expanded as it was, or
   expanded if the panel was scrolled, so the position stays visible. The
@@ -384,6 +385,29 @@ the station details and the "near me" list move from the bottom sheet to a
   sheet's built-in saved state, which would bring back how the sheet was
   before a stay in landscape.
 - **Settings and About** keep their content at most 600 dp wide, centred.
+
+### Full-screen map
+
+The map screen has no top bar: the map runs edge to edge, under the status
+bar. Settings and About keep their own top bar with Back.
+
+- **Top controls** (`ui/map/MapTopControls.kt`): the date pill, the fuel
+  button and a round settings (gear) button, all 48 dp tall. On one row when
+  they fit beside the side panel's place (landscape phones, tablets), with the
+  pill centred as far as the buttons allow; otherwise (portrait phones) the
+  pill is centred with the gear on its right and the fuel button under the
+  gear. The choice is measured, so longer labels (e.g. "Benzina · Servito")
+  can fall back to two rows; it doesn't change while the panel slides in.
+- **Status bar:** its icons follow the map (dark icons on the light map,
+  light on the dark one; the app theme while Settings or About is open), over
+  a faint wash of the map's own tone so place names don't mix with the clock.
+- **Insets:** controls and side panel keep clear of the status bar, the camera
+  cutout and a side navigation bar. The fully expanded sheet stops just below
+  the status bar; a tall sheet covers the credits and the my-location button
+  rather than pushing them up into the controls.
+- **Camera:** the "near me" circle and a station picked from the list are
+  framed below the controls; a tapped station under the panel's place or the
+  controls is panned just enough to come out.
 
 **Tablet emulator** (no tablet needed): with the SDK command-line tools,
 
