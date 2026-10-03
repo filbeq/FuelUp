@@ -712,6 +712,8 @@ fun MapScreen(
             modifier = screenModifier,
             scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState),
             sheetPeekHeight = peekHeight,
+            // A shadow like the side panel's, so the sheet floats like the other controls.
+            sheetShadowElevation = 3.dp,
             sheetDragHandle = {
                 Box(Modifier.onSizeChanged { handleHeightPx = it.height }) { BottomSheetDefaults.DragHandle() }
             },
