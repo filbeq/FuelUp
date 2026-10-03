@@ -24,7 +24,11 @@ python3 -m fuel_pipeline --prices data/prezzo_alle_8.csv \
                          --stations data/anagrafica_impianti_attivi.csv
 ```
 
-`data/` and `out/` are git-ignored. Cleaning rules, safety checks and the JSON
+`data/` and `out/` are git-ignored, and `out/` is whatever you last built: before
+analysing the data, rebuild it or use the published file
+(https://filbeq.github.io/FuelUp/stations.json). An old `out/` misses later
+pipeline fixes (it once still held the stations dropped for misplaced
+coordinates). Cleaning rules, safety checks and the JSON
 format are documented in [pipeline/README.md](pipeline/README.md).
 
 ## Continuous integration
@@ -474,8 +478,13 @@ wrong municipality (one "PISA" station is in Capannoli, 26 km away) would zoom
 the map out, so the frame leaves out those more than **5× the median distance**
 from the municipality's median point **and more than 10 km** away
 (`Municipality.mainStations`). Towns with fewer than 3 stations keep all of them
-(no telling which one is wrong). On 2 Oct 2026 data this leaves out 192 stations
-in 148 municipalities, among them misfiled ones 180–560 km away; with a 5 km
+(no telling which one is wrong). On the published 2 Oct 2026 data this leaves
+out 177 stations in 133 municipalities, at most 87 km away. These are a
+different error from the stations the pipeline drops (coordinates in another
+province): the province is right but the municipality is wrong (e.g. an "ALA"
+(TN) station 87 km from Ala, Pisa's Capannoli one), or the station is in an
+outlying part of a large town (Rome's "COIL ANZIO", 47 km out). A station of the
+same province is near each of them, so the pipeline's rule can't catch them. With a 5 km
 floor, real outlying parts of compact towns were cut too. Pisa: the limit is
 13 km, so Tirrenia (11 km, part of Pisa) stays and Capannoli goes. A station
 shows the chosen fuel's price and class, like the "near me" rows; tapping it

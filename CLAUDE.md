@@ -92,6 +92,10 @@ small enough to be tested on a real phone before moving on.
   add packages only with a clear reason). Lines are split on `|` by hand rather
   than with the `csv` module, since the files have no quoting.
 - Run from `pipeline/`: `python3 -m unittest`, `python3 -m fuel_pipeline`.
+- Before any data analysis, rebuild `pipeline/out/` from current code
+  (`python3 -m fuel_pipeline`, or `--prices/--stations` on fresh CSVs) or use
+  the published `stations.json`; never a stale `out/` (git-ignored, rebuilt
+  only by hand). A stale one once showed stations the pipeline already drops.
   JSON format and cleaning rules are documented in `pipeline/README.md`.
 - Steps: download → parse both files → join on `idImpianto` → normalize fuel
   types → emit one compact JSON (plus a small `meta.json` with data date and

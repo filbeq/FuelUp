@@ -13,7 +13,9 @@ class Municipality(val name: String, val province: String, val stations: List<St
      * Capannoli, 26 km away). Far = more than [OUTLIER_FACTOR] times the median
      * distance from the median point, and more than [OUTLIER_MIN_KM]. With fewer
      * than 3 stations there's no telling which one is wrong: all are kept.
-     * Measured on 2 Oct 2026 data: leaves out 192 stations in 148 municipalities.
+     * Measured on the published 2 Oct 2026 data: leaves out 177 stations in 133
+     * municipalities, at most 87 km away (wrong municipality in the right
+     * province, or an outlying part of a large town).
      */
     fun mainStations(): List<Station> {
         if (stations.size < 3) return stations
