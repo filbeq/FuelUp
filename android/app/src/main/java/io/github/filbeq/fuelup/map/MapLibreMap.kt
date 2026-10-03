@@ -51,12 +51,34 @@ data class CameraCommand(val id: Long, val move: CameraMove)
 sealed interface CameraMove {
     /**
      * Show the whole circle of [radiusKm] around a point, keeping clear of the
-     * controls on top and the sheet at the bottom ([topPx], [bottomPx]).
+     * controls on top, the sheet at the bottom and the side panel on the left
+     * ([topPx], [bottomPx], [leftPx]).
      */
-    data class FitCircle(val lat: Double, val lon: Double, val radiusKm: Double, val topPx: Int, val bottomPx: Int) : CameraMove
+    data class FitCircle(
+        val lat: Double,
+        val lon: Double,
+        val radiusKm: Double,
+        val topPx: Int,
+        val bottomPx: Int,
+        val leftPx: Int = 0,
+    ) : CameraMove
 
-    /** Centre a point in the free area between [topPx] and [bottomPx], zoomed in to at least [minZoom]. */
-    data class Show(val lat: Double, val lon: Double, val minZoom: Double, val topPx: Int, val bottomPx: Int) : CameraMove
+    /** Centre a point in the free area inside [topPx], [bottomPx] and [leftPx], zoomed in to at least [minZoom]. */
+    data class Show(
+        val lat: Double,
+        val lon: Double,
+        val minZoom: Double,
+        val topPx: Int,
+        val bottomPx: Int,
+        val leftPx: Int = 0,
+    ) : CameraMove
+
+    /**
+     * If the point is (or is about to be) hidden under the side panel, the
+     * [leftPx] at the left of the map, pan just enough to bring it out; else
+     * don't move.
+     */
+    data class Reveal(val lat: Double, val lon: Double, val leftPx: Int) : CameraMove
 }
 
 /**
@@ -203,24 +225,41 @@ fun MapLibreMap(
 }
 
 private fun moveCamera(map: MapLibreMap, move: CameraMove) {
+    val density = Resources.getSystem().displayMetrics.density
     when (move) {
         is CameraMove.FitCircle -> {
             val bounds = LatLngBounds.Builder()
                 .includes(Geo.circle(move.lat, move.lon, move.radiusKm, points = 16).map { LatLng(it[1], it[0]) })
                 .build()
-            val side = (16 * Resources.getSystem().displayMetrics.density).toInt()
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, side, move.topPx + side, side, move.bottomPx + side))
+            val side = (16 * density).toInt()
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngBounds(bounds, move.leftPx + side, move.topPx + side, side, move.bottomPx + side),
+            )
         }
         is CameraMove.Show -> {
             val zoom = maxOf(map.cameraPosition.zoom, move.minZoom)
-            // Centre the point, then shift it to the middle of the free area.
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngZoom(LatLng(move.lat, move.lon), zoom),
-                object : MapLibreMap.CancelableCallback {
-                    override fun onFinish() = map.scrollBy(0f, (move.bottomPx - move.topPx) / 2f, 150)
-                    override fun onCancel() = Unit
-                },
-            )
+            // Centred in the free area: the padding is set every time, since a
+            // circle fit leaves its own (a different sheet height) behind.
+            val position = CameraPosition.Builder()
+                .target(LatLng(move.lat, move.lon))
+                .zoom(zoom)
+                .padding(move.leftPx.toDouble(), move.topPx.toDouble(), 0.0, move.bottomPx.toDouble())
+                .build()
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(position))
+        }
+        is CameraMove.Reveal -> {
+            val x = map.projection.toScreenLocation(LatLng(move.lat, move.lon)).x
+            // Some room beside the panel, so the marker isn't squeezed against it.
+            val wanted = move.leftPx + REVEAL_MARGIN_DP * density
+            if (x >= wanted) return
+            // Move the camera's target left by the missing distance (the map
+            // content goes right). Not scrollBy: it doesn't end in a camera-idle
+            // event, so the camera saved for a rotation would miss the move.
+            val target = map.projection.toScreenLocation(map.cameraPosition.target ?: return)
+            val newTarget = map.projection.fromScreenLocation(PointF(target.x - (wanted - x), target.y))
+            map.animateCamera(CameraUpdateFactory.newLatLng(newTarget), 300)
         }
     }
 }
+
+private const val REVEAL_MARGIN_DP = 48

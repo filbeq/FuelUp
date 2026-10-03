@@ -72,6 +72,9 @@ private const val PEEK_ROWS = 2
  * Heights are reported through [onMeasured] for the sheet: the header alone
  * (the minimised sheet: title, order, radius) and header + first [PEEK_ROWS]
  * rows (the collapsed sheet). When [minimised], tapping the title calls [onExpand].
+ * Without [showRows] only the header is drawn (the minimised side panel; the
+ * bottom sheet hides the rows by its height instead). [closeButton] is the
+ * side panel's, placed at the end of the title row.
  */
 @Composable
 fun NearbyList(
@@ -87,6 +90,8 @@ fun NearbyList(
     onStationClick: (NearbyStation) -> Unit,
     onMeasured: (headerPx: Int, collapsedPx: Int) -> Unit,
     modifier: Modifier = Modifier,
+    showRows: Boolean = true,
+    closeButton: (@Composable () -> Unit)? = null,
 ) {
     val now = remember(stations) { Instant.now() }
     val locale = LocalConfiguration.current.locales[0]
@@ -101,7 +106,25 @@ fun NearbyList(
     }
     Column(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).onSizeChanged { headerPx = it.height }) {
+            val sortSwitch = @Composable { modifier: Modifier ->
+                SingleChoiceSegmentedButtonRow(modifier) {
+                    val sorts = NearbySort.entries
+                    sorts.forEachIndexed { index, sort ->
+                        SegmentedButton(
+                            selected = settings.sort == sort,
+                            onClick = { onSortChange(sort) },
+                            shape = SegmentedButtonDefaults.itemShape(index, sorts.size),
+                            // No check mark: keeps both labels on screen.
+                            icon = {},
+                        ) {
+                            Text(stringResource(if (sort == NearbySort.PRICE) R.string.sort_price else R.string.sort_distance))
+                        }
+                    }
+                }
+            }
             // Title, then the order switch on the right; radius chips below.
+            // In the narrower side panel the close button takes the right, and
+            // the order switch gets a line of its own.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val showList = stringResource(R.string.action_show_list)
                 Column(
@@ -122,21 +145,9 @@ fun NearbyList(
                         )
                     }
                 }
-                SingleChoiceSegmentedButtonRow(Modifier.padding(start = 8.dp)) {
-                    val sorts = NearbySort.entries
-                    sorts.forEachIndexed { index, sort ->
-                        SegmentedButton(
-                            selected = settings.sort == sort,
-                            onClick = { onSortChange(sort) },
-                            shape = SegmentedButtonDefaults.itemShape(index, sorts.size),
-                            // No check mark: keeps both labels on screen.
-                            icon = {},
-                        ) {
-                            Text(stringResource(if (sort == NearbySort.PRICE) R.string.sort_price else R.string.sort_distance))
-                        }
-                    }
-                }
+                if (closeButton == null) sortSwitch(Modifier.padding(start = 8.dp)) else closeButton()
             }
+            if (closeButton != null) sortSwitch(Modifier.padding(top = 8.dp))
             Row(
                 Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -163,10 +174,12 @@ fun NearbyList(
                 }
             }
         }
-        LazyColumn(Modifier.padding(horizontal = 16.dp).navigationBarsPadding(), state = listState) {
-            itemsIndexed(stations, key = { _, item -> item.station.id }) { index, item ->
-                val measure = if (index < PEEK_ROWS) Modifier.onSizeChanged { rowPx[index] = it.height } else Modifier
-                NearbyRow(item, choice, brands, approximate, now, onStationClick, measure)
+        if (showRows) {
+            LazyColumn(Modifier.padding(horizontal = 16.dp).navigationBarsPadding(), state = listState) {
+                itemsIndexed(stations, key = { _, item -> item.station.id }) { index, item ->
+                    val measure = if (index < PEEK_ROWS) Modifier.onSizeChanged { rowPx[index] = it.height } else Modifier
+                    NearbyRow(item, choice, brands, approximate, now, onStationClick, measure)
+                }
             }
         }
     }

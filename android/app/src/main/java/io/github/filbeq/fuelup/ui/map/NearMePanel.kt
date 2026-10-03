@@ -33,20 +33,29 @@ import kotlin.math.roundToInt
 /**
  * The "near me" part of the sheet while there is no position to show:
  * looking for it, or why there is none (permission refused, location off,
- * not found) with the way out.
+ * not found) with the way out. [closeButton] is the side panel's, at the end
+ * of the title's line.
  */
 @Composable
-fun NearMeStatusPanel(state: NearMeState, onTryAgain: () -> Unit, modifier: Modifier = Modifier) {
+fun NearMeStatusPanel(
+    state: NearMeState,
+    onTryAgain: () -> Unit,
+    modifier: Modifier = Modifier,
+    closeButton: (@Composable () -> Unit)? = null,
+) {
     val context = LocalContext.current
     Column(
         modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            stringResource(R.string.near_me_title),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.near_me_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            closeButton?.invoke()
+        }
         when (state.status) {
             NearMeStatus.Locating -> Row(
                 verticalAlignment = Alignment.CenterVertically,

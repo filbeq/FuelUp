@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -63,7 +63,8 @@ import java.time.format.DateTimeFormatter
  * (name, brand, and the price of the chosen fuel with how it compares).
  * [StationSheetBody] follows it when expanded. [ranked] is the station's
  * price for [choice] (null if it doesn't sell it). Other stations at the same
- * spot are listed underneath; tapping one calls [onOpenStation].
+ * spot are listed underneath; tapping one calls [onOpenStation]. [closeButton]
+ * is the side panel's, at the end of the name's line.
  */
 @Composable
 fun StationSheetHeader(
@@ -72,15 +73,19 @@ fun StationSheetHeader(
     ranked: RankedPrice?,
     onOpenStation: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    closeButton: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
-        Text(
-            details.displayName,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.semantics { heading() },
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                details.displayName,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            closeButton?.invoke()
+        }
         val subtitle = buildList {
             if (details.name.isNotEmpty()) add(details.brand)
             if (details.motorway) add(stringResource(R.string.station_motorway))
@@ -178,15 +183,19 @@ private fun comparisonText(ranked: RankedPrice): String {
     }
 }
 
-/** The rest of the sheet, visible when expanded: address, Navigate, all prices. */
+/**
+ * The rest of the sheet, visible when expanded: address, Navigate, all prices.
+ * [scrollState] is kept by the caller, so the position survives a rotation
+ * between the bottom sheet and the side panel.
+ */
 @Composable
-fun StationSheetBody(details: StationDetails, choice: FuelChoice, modifier: Modifier = Modifier) {
+fun StationSheetBody(details: StationDetails, choice: FuelChoice, scrollState: ScrollState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val now = remember(details) { Instant.now() }
     Column(
         modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 16.dp)
             .navigationBarsPadding()
             .padding(bottom = 16.dp),

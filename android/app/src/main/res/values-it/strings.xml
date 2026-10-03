@@ -6,6 +6,7 @@
 
     <!-- Azioni -->
     <string name="action_back">Indietro</string>
+    <string name="action_close">Chiudi</string>
     <string name="action_show_credits">Mostra i crediti</string>
 
     <!-- Schermata Informazioni -->

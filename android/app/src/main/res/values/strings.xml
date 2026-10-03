@@ -9,6 +9,7 @@
 
     <!-- Actions -->
     <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
     <string name="action_show_credits">Show credits</string>
 
     <!-- About screen -->
