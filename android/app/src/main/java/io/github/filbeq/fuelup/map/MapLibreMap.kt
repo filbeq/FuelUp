@@ -75,10 +75,10 @@ sealed interface CameraMove {
 
     /**
      * If the point is (or is about to be) hidden under the side panel, the
-     * [leftPx] at the left of the map, pan just enough to bring it out; else
-     * don't move.
+     * [leftPx] at the left of the map, or under the controls, the [topPx] at
+     * the top, pan just enough to bring it out; else don't move.
      */
-    data class Reveal(val lat: Double, val lon: Double, val leftPx: Int) : CameraMove
+    data class Reveal(val lat: Double, val lon: Double, val leftPx: Int, val topPx: Int) : CameraMove
 }
 
 /**
@@ -248,15 +248,17 @@ private fun moveCamera(map: MapLibreMap, move: CameraMove) {
             map.animateCamera(CameraUpdateFactory.newCameraPosition(position))
         }
         is CameraMove.Reveal -> {
-            val x = map.projection.toScreenLocation(LatLng(move.lat, move.lon)).x
-            // Some room beside the panel, so the marker isn't squeezed against it.
-            val wanted = move.leftPx + REVEAL_MARGIN_DP * density
-            if (x >= wanted) return
-            // Move the camera's target left by the missing distance (the map
-            // content goes right). Not scrollBy: it doesn't end in a camera-idle
+            val point = map.projection.toScreenLocation(LatLng(move.lat, move.lon))
+            // Some room beside the panel and under the controls, so the marker isn't squeezed against them.
+            val margin = REVEAL_MARGIN_DP * density
+            val dx = (move.leftPx + margin - point.x).coerceAtLeast(0f)
+            val dy = (move.topPx + margin - point.y).coerceAtLeast(0f)
+            if (dx == 0f && dy == 0f) return
+            // Move the camera's target left/up by the missing distance (the map
+            // content goes right/down). Not scrollBy: it doesn't end in a camera-idle
             // event, so the camera saved for a rotation would miss the move.
             val target = map.projection.toScreenLocation(map.cameraPosition.target ?: return)
-            val newTarget = map.projection.fromScreenLocation(PointF(target.x - (wanted - x), target.y))
+            val newTarget = map.projection.fromScreenLocation(PointF(target.x - dx, target.y - dy))
             map.animateCamera(CameraUpdateFactory.newLatLng(newTarget), 300)
         }
     }

@@ -497,12 +497,12 @@ fun MapScreen(
                 selectedStationId = selectedStationId,
                 onStationClick = { id ->
                     selectStation(id)
-                    // A station under the side panel's place: bring it out beside the panel.
+                    // A station under the side panel's place or the controls: bring it out beside / below them.
                     val target = if (wide) state.snapshot?.stationDetails(id) else null
                     if (target != null) {
                         cameraCommand = CameraCommand(
                             id = (cameraCommand?.id ?: 0) + 1,
-                            move = CameraMove.Reveal(target.lat, target.lon, leftPx = panelCoverPx),
+                            move = CameraMove.Reveal(target.lat, target.lon, leftPx = panelCoverPx, topPx = topControlsPx),
                         )
                     }
                 },
