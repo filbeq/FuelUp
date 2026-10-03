@@ -9,6 +9,9 @@ the Italian Ministry of Enterprises and Made in Italy (MIMIT).
 
 ## Status
 
+[![Published data](https://github.com/filbeq/FuelUp/actions/workflows/check-data.yml/badge.svg)](https://github.com/filbeq/FuelUp/actions/workflows/check-data.yml)
+(green: the latest prices are online)
+
 Early development, not yet on the Play Store. Today the app shows every
 station in Italy on the map (grouped when zoomed out) and works offline with
 the last downloaded data. Pick your fuel (and self or served) and each station

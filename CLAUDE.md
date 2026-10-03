@@ -107,8 +107,17 @@ small enough to be tested on a real phone before moving on.
   dates, >10% of rows dropped, too few stations/prices), so a bad upstream
   file is never published.
 - Unit tests with fixture rows that reproduce the real quirks.
-- Scheduled GitHub Action, twice a day: run tests, build JSON, publish to
-  GitHub Pages via `actions/deploy-pages` (do NOT commit daily data to `main`).
+- Scheduled GitHub Action: run tests, build JSON, publish to GitHub Pages via
+  `actions/deploy-pages` (do NOT commit daily data to `main`). GitHub starts
+  scheduled runs hours late or drops them (seen 2–3 Oct 2026: runs 4.5–6.5 h late,
+  then none), so it runs every 2 h (07:10–21:10 UTC, off the hour); a first
+  `check` job (`python -m fuel_pipeline.freshness needs-publish`) skips the
+  build when MIMIT's `Estrazione del` date equals the published `dataDate`.
+  A manual run always publishes.
+- Staleness alarm (`.github/workflows/check-data.yml`, 4 runs a day): fails, so
+  GitHub emails the owner, when MIMIT has had newer prices for > 3 h, or when
+  yesterday's prices aren't published by 14:00 Italian time. Dry run: "Run
+  workflow" with a fake published date. README shows its badge.
 - Version the JSON schema; the app must reject unknown major versions gracefully.
 - CI (`.github/workflows/ci.yml`, every push/PR): pipeline tests, the
   pipeline/app contract check (`make_android_fixture.py --check`), and the

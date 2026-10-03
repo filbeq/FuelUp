@@ -6,8 +6,9 @@ app is, see the [README](README.md).
 ```
 pipeline/   Python data pipeline: download MIMIT data, clean it, write JSON
 android/    Android app (Kotlin, Jetpack Compose, MapLibre)
-.github/    GitHub Actions: CI on every push (tests, lint, contract check) and
-            the workflow that publishes the data to GitHub Pages
+.github/    GitHub Actions: CI on every push (tests, lint, contract check), the
+            workflow that publishes the data to GitHub Pages, and a check
+            that the published data is up to date
 ```
 
 ## Data pipeline
@@ -52,10 +53,15 @@ Run the same checks locally before pushing:
 
 The workflow [`.github/workflows/publish-data.yml`](.github/workflows/publish-data.yml)
 runs the pipeline tests and the same contract check as CI, then the pipeline,
-then deploys the output to GitHub Pages. It runs
-twice a day (07:30 and 15:30 UTC; MIMIT publishes around 06:45 UTC) and on demand.
+then deploys the output to GitHub Pages. It runs every 2 hours from 07:10 to
+21:10 UTC (MIMIT publishes around 06:45 UTC) and on demand. A first `check` job
+compares MIMIT's extraction date with the published `dataDate` and skips the
+build when nothing is new (about 20 seconds); a manual run always publishes.
 If the tests or the pipeline fail, nothing is deployed and the previous data stays
 online. The data is never committed to the repository.
+
+Why so many runs: GitHub starts scheduled runs late (4.5–6.5 hours on 2 Oct
+2026) or drops them (3 Oct 2026: none). One run out of eight is enough.
 
 | File | URL |
 |---|---|
@@ -74,6 +80,29 @@ curl -s https://filbeq.github.io/FuelUp/meta.json   # dataDate = date the prices
 
 GitHub disables scheduled workflows in public repositories after 60 days without
 commits; re-enable it from the Actions tab if that happens.
+
+### Staleness alarm
+
+[`.github/workflows/check-data.yml`](.github/workflows/check-data.yml) runs four
+times a day (10:40, 13:40, 16:40, 19:40 UTC) and **fails** when:
+
+- MIMIT has had newer prices for more than 3 hours and they are not published, or
+- by 14:00 Italian time the published data doesn't hold yesterday's prices (this
+  also catches MIMIT itself not publishing).
+
+GitHub emails the repository owner about failed scheduled runs (Settings →
+Notifications → Actions), and the README badge turns red. The run page lists
+what's wrong and the fix (run **Publish fuel data** by hand).
+
+Rules and tests: `pipeline/fuel_pipeline/freshness.py`,
+`pipeline/tests/test_freshness.py`. To see a failure without waiting for one:
+Actions tab → **Check published data** → **Run workflow** → enter an old date
+(e.g. `2026-09-30`) as the fake published date. Or locally, from `pipeline/`:
+
+```sh
+python3 -m fuel_pipeline.freshness check                               # real check
+python3 -m fuel_pipeline.freshness check --published-date 2026-09-30   # dry run
+```
 
 ## Android app
 
