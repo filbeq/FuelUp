@@ -60,3 +60,9 @@ jobs:
 
       - name: Unit tests and lint
         run: ./gradlew test lint --console=plain
+
+      # Unsigned here (no keystore in CI): checks that R8 (minification and
+      # resource shrinking) still succeeds, so a problem shows on every push
+      # rather than when a release is tagged.
+      - name: Release build
+        run: ./gradlew assembleRelease --console=plain

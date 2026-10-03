@@ -1,3 +1,20 @@
+/**
+ * versionCode derived from versionName "MAJOR.MINOR.PATCH": MAJOR * 10000 +
+ * MINOR * 100 + PATCH (0.1.0 -> 100, 1.2.3 -> 10203). Android only installs an
+ * update with a higher versionCode, so this grows with every release as long as
+ * MINOR and PATCH stay below 100.
+ */
+fun versionCodeOf(versionName: String): Int {
+    val parts = versionName.split(".").map { it.toIntOrNull() }
+    require(parts.size == 3 && parts.all { it != null && it in 0..99 }) {
+        "versionName must be MAJOR.MINOR.PATCH with numbers 0-99, was '$versionName'"
+    }
+    val (major, minor, patch) = parts.map { it!! }
+    return major * 10000 + minor * 100 + patch
+}
+
+val appVersionName = "0.1.0" // bump for every release, see DEVELOPMENT.md "Releases"
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -12,8 +29,8 @@ android {
         applicationId = "io.github.filbeq.fuelup"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionName = appVersionName
+        versionCode = versionCodeOf(appVersionName)
     }
 
     buildTypes {
@@ -24,12 +41,20 @@ android {
             applicationIdSuffix = ".debug"
             // Debug builds only carry MapLibre's native code for 64-bit ARM phones
             // (~25 MB instead of ~62 MB per install). For an x86_64 emulator, add
-            // "x86_64" here. Release bundles are unaffected: the Play Store delivers
-            // only the code each phone needs.
+            // "x86_64" here.
             ndk { abiFilters += "arm64-v8a" }
         }
         release {
-            isMinifyEnabled = false
+            // R8: removes unused code (incl. the debug-only branches behind
+            // BuildConfig.DEBUG), shortens names, and drops unused resources.
+            // Keep rules: proguard-rules.pro (libraries bring their own).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // One APK for every real phone: 64-bit and 32-bit ARM (budget phones
+            // can run a 32-bit Android). x86/x86_64 (emulators, Chromebooks) would
+            // add ~26 MB; reconsider for a Play Store bundle, where each phone
+            // downloads only its own ABI.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -43,8 +68,7 @@ android {
     }
 
     lint {
-        // Debug builds are arm64-only on purpose (see buildTypes.debug); release
-        // bundles keep every ABI, including x86_64 for ChromeOS.
+        // No x86_64 on purpose: see the ABI filters in buildTypes.
         disable += "ChromeOsAbiSupport"
     }
 
