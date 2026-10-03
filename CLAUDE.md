@@ -391,6 +391,8 @@ small enough to be tested on a real phone before moving on.
   - no hard-coded user-facing strings; everything in `strings.xml`
   - `values/` = English (default), `values-it/` = Italian
   - per-app language support (`locales_config.xml`, Android 13+ picker)
+  - the APK keeps only `en` and `it` resources (`localeFilters`), so library
+    texts never show in a third language or a pseudo-locale
   - localized number/currency formatting with the fuel's own unit
     (e.g. `1,849 €/l` vs `€1.849/l`, and `1,794 €/kg` for methane)
   - fuel type labels come from string resources keyed by the enum;

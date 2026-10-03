@@ -101,6 +101,13 @@ android {
         disable += "ChromeOsAbiSupport"
     }
 
+    androidResources {
+        // Only the app's own languages (like res/xml/locales_config.xml): library
+        // texts (e.g. Material's) then never appear in a third language, or in
+        // a test pseudo-locale, next to the app's English or Italian.
+        localeFilters += listOf("en", "it")
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true // the About screen shows BuildConfig.VERSION_NAME

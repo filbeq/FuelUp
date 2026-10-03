@@ -614,8 +614,10 @@ renamed municipalities, e.g. "CORIGLIANO CALABRO"), so they couldn't be checked.
   (English) **and** `res/values-it/strings.xml` (Italian). Lint fails the build
   if a translation is missing.
 - Proper names (FuelUp, OpenFreeMap, …) are marked `translatable="false"`.
-- When adding a language, add `res/values-xx/` and a line in
-  `res/xml/locales_config.xml`.
+- When adding a language, add `res/values-xx/`, a line in
+  `res/xml/locales_config.xml` and its code in `localeFilters`
+  (`app/build.gradle.kts`; the APK keeps only those languages, also for the
+  libraries' texts).
 
 ## Releases
 
