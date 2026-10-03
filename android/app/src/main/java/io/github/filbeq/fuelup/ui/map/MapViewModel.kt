@@ -14,6 +14,7 @@ import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.StationRepository
+import io.github.filbeq.fuelup.data.StationSearch
 import io.github.filbeq.fuelup.data.standardFuelIndices
 import io.github.filbeq.fuelup.map.StationLayers
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,8 @@ data class MapUiState(
     val lastChecked: Instant? = null,
     /** "Update data now" in Settings. */
     val manualUpdate: ManualUpdate = ManualUpdate.Idle,
+    /** Search over [snapshot]; null until built (off the main thread, after the map data). */
+    val search: StationSearch? = null,
 )
 
 /** State of the "Update data now" button in Settings. */
@@ -99,6 +102,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = MapUiState(
                 cached, prepared?.geoJson, DataStatus.Loading, choice, prepared?.ranking.orEmpty(), lastChecked,
             )
+            cached?.let { viewModelScope.launch { buildSearch(it) } }
             refresh(force = false)
         }
     }
@@ -160,13 +164,23 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     stationsGeoJson = prepared?.geoJson,
                     ranking = prepared?.ranking.orEmpty(),
                     status = DataStatus.Ready,
+                    search = null,
                 )
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
                 RefreshResult.Failed -> it.copy(status = DataStatus.Failed)
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
             }.copy(lastChecked = lastChecked)
         }
+        if (result is RefreshResult.Updated) viewModelScope.launch { buildSearch(result.snapshot) }
         return result
+    }
+
+    /** Builds the search for [snapshot] once the map shows it; kept unless newer data replaced it meanwhile. */
+    private suspend fun buildSearch(snapshot: Snapshot) {
+        val search = withContext(Dispatchers.Default) {
+            PerfLog.timeWithHeap("build search index") { StationSearch.build(snapshot.stations) }
+        }
+        _state.update { if (it.snapshot === snapshot) it.copy(search = search) else it }
     }
 
     private class Prepared(val ranking: Map<Int, RankedPrice>, val geoJson: String)
