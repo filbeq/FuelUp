@@ -10,7 +10,7 @@ from datetime import date
 from pathlib import Path
 
 SEPARATOR = "|"
-_EXTRACTION_RE = re.compile(r"^Estrazione del (\d{4}-\d{2}-\d{2})\s*$")
+EXTRACTION_RE = re.compile(r"^Estrazione del (\d{4}-\d{2}-\d{2})\s*$")
 
 
 class FormatError(Exception):
@@ -26,7 +26,7 @@ def parse_header(lines: list[str], expected_columns: list[str]) -> date:
     """Validate the two header lines and return the extraction date."""
     if len(lines) < 2:
         raise FormatError("file has fewer than two header lines")
-    match = _EXTRACTION_RE.match(lines[0].strip())
+    match = EXTRACTION_RE.match(lines[0].strip())
     if not match:
         raise FormatError(f"unexpected first line: {lines[0][:80]!r}")
     columns = [c.strip() for c in lines[1].split(SEPARATOR)]
