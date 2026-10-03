@@ -15,6 +15,7 @@ small enough to be tested on a real phone before moving on.
   /pipeline    Python data pipeline (download, clean, publish JSON)
   /android     Android app (Kotlin + Jetpack Compose)
   /.github     GitHub Actions workflows
+  /release-notes  user-facing notes per app version (X.Y.Z.md)
   ```
 - Commits: small and atomic, one logical change each. Messages in English,
   imperative mood, short subject line (≤ 60 chars), Conventional Commits prefix:
@@ -125,8 +126,8 @@ small enough to be tested on a real phone before moving on.
 - Version the JSON schema; the app must reject unknown major versions gracefully.
 - CI (`.github/workflows/ci.yml`, every push/PR): pipeline tests, the
   pipeline/app contract check (`make_android_fixture.py --check`), and the
-  app's `./gradlew test lint`. The publish workflow runs the same contract
-  check before deploying.
+  app's `./gradlew test lint assembleRelease` (unsigned, catches R8 failures).
+  The publish workflow runs the same contract check before deploying.
 
 ## Android app (/android)
 
@@ -293,7 +294,22 @@ small enough to be tested on a real phone before moving on.
   not the app theme. On the dark map its colour is only moderately different
   from the grey "average" marker (ΔE ≈ 11); the form (translucent ring + "da"
   label vs small solid disc) keeps them apart.
-- Debug builds are arm64-only to keep installs small; release keeps all ABIs.
+- Debug builds are arm64-only to keep installs small; the release APK has
+  arm64-v8a + armeabi-v7a (~25 MB, every real phone; x86/x86_64 left out).
+- Releases (step 9): GitHub Releases only for now, GPL-3.0 (© filbeq;
+  LICENSE, THIRD_PARTY_NOTICES.md, legal notice in About). R8 +
+  resource shrinking on; `proguard-rules.pro` holds only rules proven
+  necessary. `appVersionName` in `app/build.gradle.kts` is the single version
+  source; versionCode = MAJOR×10000 + MINOR×100 + PATCH. Signing: PKCS12
+  keystore outside the repo (owner's, backed up), from env vars in CI or
+  git-ignored `android/keystore.properties` locally; none → unsigned APK.
+  `.github/workflows/release.yml`: tag `vX.Y.Z` (must match appVersionName,
+  needs `release-notes/X.Y.Z.md`) → tests, lint, signed APK, `gh release
+  create` (pre-release while 0.x) with APK + R8 mapping; manual run = dry run
+  (artifact only). Secrets: `RELEASE_KEYSTORE_BASE64`,
+  `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`. Details and the release
+  test checklist: DEVELOPMENT.md "Releases". No in-app update check (would
+  contact GitHub; must be off in a Play build): maybe later.
 - Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
   (system default unless chosen in Settings); no dynamic colour.
 - Compass (step 8.8): MapLibre's own compass is off (it sat under the search
@@ -470,6 +486,9 @@ personal use on the test phone. Done in step 8 so far:
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
+Step 9 (first GitHub pre-release, 0.1.0): release build, signing, release
+workflow, licence, README done; release test on the phone and the tag pending.
+
 Next: the rest of step 8 (see the backlog below).
 
 ### Open issues (known, not yet fixed)
@@ -552,5 +571,8 @@ Next: the rest of step 8 (see the backlog below).
    cheapest-nearby list (5/10/20 km, price/distance).
 8. Later: see "Backlog for step 8" above (layout fixes, map reload, cold
    start, search, favourites, price history, publishing prep incl. renaming).
+
+9. First GitHub release (pre-release 0.1.0): R8, signing, release workflow,
+   GPL-3.0 + notices, README for users, "FuelUp Dev" debug app.
 
 Finish each step with a working build and a commit before starting the next.

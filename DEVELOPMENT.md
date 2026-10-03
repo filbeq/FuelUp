@@ -39,7 +39,7 @@ pull request:
 | Job | Checks |
 |---|---|
 | Pipeline tests and app contract | `python -m unittest` in `pipeline/`, then `python scripts/make_android_fixture.py --check` |
-| App unit tests and lint | `./gradlew test lint` in `android/` (JDK 21; the Gradle wrapper is validated) |
+| App unit tests and lint | `./gradlew test lint assembleRelease` in `android/` (JDK 21; the Gradle wrapper is validated; the release APK is built unsigned, to catch R8 problems early) |
 
 The contract check regenerates the app's test fixture from the pipeline and
 fails, with a diff, if it differs from the committed one. When it fails, the
@@ -50,7 +50,7 @@ Run the same checks locally before pushing:
 
 ```sh
 (cd pipeline && python3 -m unittest && python3 scripts/make_android_fixture.py --check)
-(cd android && ./gradlew test lint)
+(cd android && ./gradlew test lint assembleRelease)
 ```
 
 ## Data publishing (GitHub Pages)
@@ -135,7 +135,8 @@ Trust project → wait for the Gradle sync to finish.
 cd android
 ./gradlew assembleDebug        # APK in app/build/outputs/apk/debug/
 ./gradlew lint                 # also checks that every string is translated
-./gradlew installDebug         # install on the connected phone
+./gradlew installDebug         # install on the connected phone (as "FuelUp Dev")
+./gradlew assembleRelease      # minified release APK, see "Releases"
 ```
 
 No API keys are needed: the map uses OpenFreeMap tiles.
@@ -615,3 +616,120 @@ renamed municipalities, e.g. "CORIGLIANO CALABRO"), so they couldn't be checked.
 - Proper names (FuelUp, OpenFreeMap, …) are marked `translatable="false"`.
 - When adding a language, add `res/values-xx/` and a line in
   `res/xml/locales_config.xml`.
+
+## Releases
+
+The app is published as a signed APK on
+[GitHub Releases](https://github.com/filbeq/FuelUp/releases) by
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+### Versions
+
+`appVersionName` at the top of `android/app/build.gradle.kts` is the only
+place to change: `MAJOR.MINOR.PATCH`, numbers 0–99. The `versionCode` Android
+uses to accept an update is derived from it: `MAJOR × 10000 + MINOR × 100 +
+PATCH` (0.1.0 → 100, 1.2.3 → 10203), so it grows with every release. While
+`MAJOR` is 0 the GitHub Release is marked as a pre-release.
+
+- PATCH: fixes only. MINOR: new features. MAJOR: 1.0.0 for the first stable
+  (Play Store) version.
+- Never reuse or lower a version: phones refuse to install a lower
+  `versionCode` over a higher one.
+
+### Release build
+
+`isMinifyEnabled` and `isShrinkResources` are on: R8 removes unused code
+(including everything behind `BuildConfig.DEBUG`: StrictMode, `PerfLog`) and
+unused resources, and renames classes. Libraries ship their own keep rules
+(kotlinx.serialization, MapLibre, AndroidX); `android/app/proguard-rules.pro`
+holds only rules that a release build or a release test proved necessary, each
+with its reason. R8 bugs only show in release builds: after upgrading a library,
+test a release build on a phone (checklist below).
+
+The APK carries MapLibre's native code for `arm64-v8a` and `armeabi-v7a`
+(~25 MB): every real phone, including budget phones with a 32-bit Android.
+x86/x86_64 (emulators, Chromebooks) are left out: +26 MB.
+
+Debug builds install as a separate app, **FuelUp Dev**
+(`io.github.filbeq.fuelup.debug`), so the release app and its data are never
+touched by testing.
+
+### Signing key
+
+Every release must be signed with the **same key**, forever: Android installs
+an update only if its signature matches the installed app. Create it once:
+
+```sh
+mkdir -p ~/fuelup-keys
+keytool -genkeypair -v -keystore ~/fuelup-keys/fuelup-release.jks \
+  -storetype PKCS12 -alias fuelup -keyalg RSA -keysize 4096 -validity 10000 \
+  -dname "CN=filbeq"
+```
+
+`keytool` (part of the JDK; Android Studio's is in `jbr/bin/`) asks for a
+password; with PKCS12 the key uses the same password as the keystore.
+
+**Back up** the file `fuelup-release.jks` **and** its password, in two places
+off this computer (e.g. a password manager entry with the file attached, plus
+an encrypted USB stick). The alias is `fuelup`. If the key is lost, no update
+can be installed over existing installs (users must uninstall, losing their
+favourites); if it leaks, someone else can sign "updates". Never put it in the
+repository (`*.jks` and `keystore.properties` are git-ignored).
+
+To build a signed release locally, create `android/keystore.properties`
+(git-ignored) pointing to the key outside the repository:
+
+```properties
+storeFile=/home/<you>/fuelup-keys/fuelup-release.jks
+storePassword=<password>
+keyAlias=fuelup
+```
+
+then `./gradlew assembleRelease` → `android/app/build/outputs/apk/release/app-release.apk`
+(without `keystore.properties`: `app-release-unsigned.apk`). Check it with
+`$ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs <apk>`.
+CI reads the same values from environment variables (`RELEASE_KEYSTORE_FILE`,
+`RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`).
+
+### Repository secrets
+
+On GitHub: repository → **Settings** → **Secrets and variables** → **Actions**
+→ **New repository secret**, three times:
+
+| Name | Value |
+|---|---|
+| `RELEASE_KEYSTORE_BASE64` | the key file as text: `base64 -w0 ~/fuelup-keys/fuelup-release.jks` (copy the whole output) |
+| `RELEASE_KEYSTORE_PASSWORD` | the keystore password |
+| `RELEASE_KEY_ALIAS` | `fuelup` |
+
+Secrets can't be read back, only replaced. Workflows triggered by pull
+requests from forks don't receive them.
+
+**Dry run:** Actions → Release → **Run workflow** builds and signs the APK and
+keeps it as a workflow artifact (7 days) without publishing anything. Its
+signing-certificate SHA-256 (in the log) must match the local build's.
+
+### Publishing a release
+
+1. Bump `appVersionName` in `android/app/build.gradle.kts`.
+2. Write `release-notes/<version>.md` (user-facing: what changed). The
+   workflow appends install instructions, the APK's SHA-256 and the signing
+   certificate's SHA-256.
+3. Test a release build on a phone (below), commit, push, wait for CI.
+4. Tag and push the tag: `git tag v<version> && git push origin v<version>`.
+5. The workflow checks that the tag matches `appVersionName`, runs tests and
+   lint, builds and signs the APK and creates the Release with
+   `FuelUp-<version>.apk` and `mapping-<version>.txt` (R8's renaming map, to
+   decode stack traces from crash reports with `retrace`).
+
+### Release test checklist
+
+Install the signed release APK (`adb install -r <apk>`) and check, with
+`adb logcat -b crash` open: first start without cache (download, map, date);
+restart from cache; every fuel and self/served, choice kept after restart;
+station sheet (expand, Navigate, "Also at this location"); search (town,
+station, brand); favourites (star, list, map star, kept after restart); near
+me (permission, radius, sort, opening on the position at the next start);
+Settings (theme, map style, language, Update data now); About; rotation and
+side panel; compass; process death on Settings (Home, `adb shell am kill
+io.github.filbeq.fuelup`, reopen: Settings is back); offline start.
