@@ -18,6 +18,7 @@ import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
@@ -26,6 +27,7 @@ import androidx.compose.material3.SearchBarState
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -101,7 +103,12 @@ fun MapSearchExpanded(
     val inputField = @Composable { SearchInput(searchBarState, textFieldState) }
     val colors = SearchBarDefaults.colors(containerColor = floatingSurfaceColor())
     val content = @Composable {
-        SearchResultsList(ready, query, results, choice, ranking, brands, favorites, position, onMunicipalityClick, onStationClick)
+        // The expanded bar is a separate window: without this, text with no
+        // explicit colour (names, prices) is Compose's default black, unreadable
+        // in the dark theme.
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            SearchResultsList(ready, query, results, choice, ranking, brands, favorites, position, onMunicipalityClick, onStationClick)
+        }
     }
     if (docked) {
         ExpandedDockedSearchBar(state = searchBarState, inputField = inputField, colors = colors) { content() }
