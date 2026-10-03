@@ -18,6 +18,10 @@ android {
 
     buildTypes {
         debug {
+            // Installed as a separate app ("FuelUp Dev", badged icon in
+            // src/debug/res), so testing never touches the release install and
+            // its data. The Kotlin package (namespace) is unchanged.
+            applicationIdSuffix = ".debug"
             // Debug builds only carry MapLibre's native code for 64-bit ARM phones
             // (~25 MB instead of ~62 MB per install). For an x86_64 emulator, add
             // "x86_64" here. Release bundles are unaffected: the Play Store delivers

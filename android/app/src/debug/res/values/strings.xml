@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds install next to the release app (applicationIdSuffix ".debug"),
+     so they get their own name in the launcher. -->
+<resources>
+    <string name="app_name" translatable="false">FuelUp Dev</string>
+</resources>

@@ -151,6 +151,12 @@ No API keys are needed: the map uses OpenFreeMap tiles.
 4. Check it is visible: `adb devices` should list it as `device`.
 5. Android Studio ▶ Run with the phone selected, or `./gradlew installDebug`.
 
+Debug builds install as a separate app, **FuelUp Dev** (id
+`io.github.filbeq.fuelup.debug`, "DEV" badge on the icon), next to the release
+app (`io.github.filbeq.fuelup`). Each has its own data, settings and
+favourites; `adb` commands for testing (`run-as`, `am start`, `pm`) use the
+`.debug` id.
+
 If `adb devices` shows nothing although the cable is connected: unlock the
 phone, look for the "Allow USB debugging?" prompt, or turn USB debugging off
 and on again.
@@ -570,8 +576,8 @@ include **only** `favorites.xml` (`res/xml/backup_rules.xml` for Android 11 and
 older, `res/xml/data_extraction_rules.xml` for 12+). So favourites come back
 after a reinstall from the Play Store or on a new phone; the cached data,
 settings and language don't. An `adb install` doesn't restore by itself; to
-test: `adb shell bmgr backupnow io.github.filbeq.fuelup`, uninstall, install,
-`adb shell bmgr restore io.github.filbeq.fuelup` (needs a backup transport on
+test: `adb shell bmgr backupnow io.github.filbeq.fuelup.debug`, uninstall,
+install, `adb shell bmgr restore io.github.filbeq.fuelup.debug` (needs a backup transport on
 the phone). Play's Data safety form counts as "collected" only what the app
 itself sends off the phone; the backup is Android's, in the user's account, so
 nothing is declared.

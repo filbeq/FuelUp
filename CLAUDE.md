@@ -132,6 +132,8 @@ small enough to be tested on a real phone before moving on.
 
 - Kotlin, Jetpack Compose, Material 3, single-activity, MVVM
   (ViewModel + StateFlow). Package `io.github.filbeq.fuelup`, app name FuelUp.
+  Debug builds: id `io.github.filbeq.fuelup.debug`, name "FuelUp Dev", "DEV"
+  badge on the icon (`src/debug/res`), installed next to the release app.
 - Toolchain: AGP 9 (Kotlin is built in: do not apply `org.jetbrains.kotlin.android`),
   Compose compiler plugin matching the Kotlin version, version catalog in
   `gradle/libs.versions.toml`. minSdk 26, targetSdk 36, compileSdk 37 (required
@@ -503,6 +505,12 @@ Next: the rest of step 8 (see the backlog below).
   afterwards (never assume values), then diff: `shared_prefs/settings.xml`,
   the AppCompat language record in `files/`, system `accelerometer_rotation`,
   `user_rotation`, `font_scale` (and radios if airplane mode is used).
+- The phone has two FuelUp apps: the release (`io.github.filbeq.fuelup`, the
+  owner's daily app, installed from a GitHub Release) and "FuelUp Dev"
+  (`io.github.filbeq.fuelup.debug`, `installDebug`). All tests use FuelUp Dev:
+  every `run-as`, `am start`, `am force-stop`, `pm` command names the
+  `.debug` id. Never install over, clear or uninstall the release app; a
+  release build is tested only when the owner asks, after a snapshot.
 - Tablet tests: emulator AVD `fuelup_tablet` (Pixel Tablet, API 36 x86_64,
   SDK cmdline-tools installed); never change the phone's `wm size`/density.
   Setup, x86_64 build and mock location in DEVELOPMENT.md ("Wide screens").
@@ -518,7 +526,7 @@ Next: the rest of step 8 (see the backlog below).
   `/actions/runs/<id>/jobs`). Without a token, workflows can't be started from
   here: the owner clicks "Run workflow" in the Actions tab.
 - App settings live in `shared_prefs/settings.xml`; edit them for tests with
-  `adb shell "run-as io.github.filbeq.fuelup sed -i '…' shared_prefs/settings.xml"`
+  `adb shell "run-as io.github.filbeq.fuelup.debug sed -i '…' shared_prefs/settings.xml"`
   (quote the whole command, or the device shell treats `<` as a redirect).
 - Background waits: never `pgrep -f` a string that is also in the waiting
   command (it matches itself); never leave a bare `cat` in a pipeline (it
