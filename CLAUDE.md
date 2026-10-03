@@ -163,6 +163,14 @@ small enough to be tested on a real phone before moving on.
   Self/Servito, and the price legend with a meaning per class (incl. "not
   compared"). The mode row keeps its height for LPG/CNG/LNG (a note instead),
   so chips don't move when the fuel changes. Panel open state survives rotation.
+  Fuels are tiles (pump icon + name): the one exception to the "no green / no
+  orange-red UI" rule, used **only inside the panel** (`fuelColor` in
+  `ui/theme/Color.kt`): Benzina green, Gasolio ochre, GPL purple, Metano azure,
+  GNL indigo, darker tones in light theme. Checked: icon contrast >= 3.7:1, and
+  ΔE2000 >= 20 from the price colours (>= 10 under simulated protan/deutan/
+  tritan; Benzina exempt from "cheap"). The map button keeps a neutral pump.
+  Selected tile: thick outline + tinted background + check mark. All labels use
+  one size: the largest at which the longest label fits.
 - Price colours: compare with the median of the 25 nearest stations (same
   fuel/mode, 50 km), classify by cents (±2 c), never by rank (prices are clumped,
   e.g. Eni 1.990 nationwide). Separate groups: motorway (8 nearest, 100 km) and

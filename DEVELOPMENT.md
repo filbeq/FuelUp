@@ -224,7 +224,7 @@ the main thread (MapLibre's own start-up shows up there; our code doesn't).
 ### Fuel filter and price comparison
 
 **Fuel choice.** The button on the right of the map shows the current choice
-and opens a bottom sheet with chips for the standard product of each type
+and opens a bottom sheet with tiles for the standard product of each type
 (Benzina, Gasolio, GPL, Metano incl. L-GNC, GNL); special products like
 "Blue Super" don't count.
 Self/Servito only for petrol and diesel: on 30/09/2026, LPG, methane and LNG were
