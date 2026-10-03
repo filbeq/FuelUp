@@ -18,7 +18,8 @@ data class UserPosition(val lat: Double, val lon: Double, val accuracyMeters: Fl
 
 /** Outcome of [UserLocator.locate]. */
 sealed interface LocateResult {
-    data class Found(val position: UserPosition) : LocateResult
+    /** [lastKnown]: an earlier fix the phone already had (instant, possibly a bit old). */
+    data class Found(val position: UserPosition, val lastKnown: Boolean = false) : LocateResult
     /** Location is switched off in the phone's settings. */
     data object LocationOff : LocateResult
     /** No position in time, or no location provider on this phone. */
@@ -39,27 +40,44 @@ class UserLocator(context: Context) {
     private val context = context.applicationContext
     private val manager = context.getSystemService(LocationManager::class.java)
 
-    suspend fun locate(): LocateResult {
+    /**
+     * A position, fast: a last known fix at most [recentMs] old if there is one,
+     * else the first fresh answer within [TIMEOUT_MS], else an older last known fix.
+     */
+    @Suppress("MissingPermission") // checked in withProviders()
+    suspend fun locate(recentMs: Long = RECENT_MS): LocateResult = withProviders { manager, providers ->
+        val last = providers.mapNotNull { manager.getLastKnownLocation(it) }.minByOrNull { it.ageMillis() }
+        last?.takeIf { it.ageMillis() <= recentMs }?.let { return@withProviders found(it, lastKnown = true) }
+        val fresh = withTimeoutOrNull(TIMEOUT_MS) { firstLocation(manager, providers) }
+        // Nothing fresh in time: an older fix is still better than nothing.
+        fresh?.let { found(it) }
+            ?: last?.takeIf { it.ageMillis() <= STALE_MS }?.let { found(it, lastKnown = true) }
+            ?: LocateResult.Unavailable
+    }
+
+    /** A fresh fix only (no last known one), within [TIMEOUT_MS]: refines a [locate] answered from the last known fix. */
+    suspend fun freshLocation(): LocateResult = withProviders { manager, providers ->
+        withTimeoutOrNull(TIMEOUT_MS) { firstLocation(manager, providers) }?.let { found(it) } ?: LocateResult.Unavailable
+    }
+
+    /** Checks permission, location switch and providers, then runs [block]. */
+    private suspend fun withProviders(block: suspend (LocationManager, List<String>) -> LocateResult): LocateResult {
         val precise = granted(Manifest.permission.ACCESS_FINE_LOCATION)
         if (!precise && !granted(Manifest.permission.ACCESS_COARSE_LOCATION)) return LocateResult.NoPermission
         if (manager == null) return LocateResult.Unavailable
         if (!LocationManagerCompat.isLocationEnabled(manager)) return LocateResult.LocationOff
         val providers = providers(manager, precise)
         if (providers.isEmpty()) return LocateResult.Unavailable
-
         return try {
-            val last = providers.mapNotNull { manager.getLastKnownLocation(it) }.minByOrNull { it.ageMillis() }
-            val location = last?.takeIf { it.ageMillis() <= RECENT_MS }
-                ?: withTimeoutOrNull(TIMEOUT_MS) { firstLocation(manager, providers) }
-                // Nothing fresh in time: an older fix is still better than nothing.
-                ?: last?.takeIf { it.ageMillis() <= STALE_MS }
-            location?.let { LocateResult.Found(UserPosition(it.latitude, it.longitude, it.accuracy)) }
-                ?: LocateResult.Unavailable
+            block(manager, providers)
         } catch (e: SecurityException) {
             // Permission revoked between the check and the call.
             LocateResult.NoPermission
         }
     }
+
+    private fun found(location: Location, lastKnown: Boolean = false) =
+        LocateResult.Found(UserPosition(location.latitude, location.longitude, location.accuracy), lastKnown)
 
     private fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -76,7 +94,7 @@ class UserLocator(context: Context) {
     }
 
     /** Asks every provider at once; the first position wins (one may be much slower than the other). */
-    @Suppress("MissingPermission") // checked in locate()
+    @Suppress("MissingPermission") // checked in withProviders()
     private suspend fun firstLocation(manager: LocationManager, providers: List<String>): Location? =
         suspendCancellableCoroutine { continuation ->
             val signals = providers.map { CancellationSignal() }
@@ -101,13 +119,15 @@ class UserLocator(context: Context) {
     private fun Location.ageMillis() =
         (SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / 1_000_000
 
-    private companion object {
+    companion object {
         /** A last known position this recent is used directly (instant answer). */
         const val RECENT_MS = 2 * 60 * 1000L
+        /** At launch a slightly older one is fine: a fresh fix follows in the background. */
+        const val LAUNCH_RECENT_MS = 10 * 60 * 1000L
         /** Fallback when no fresh position arrives in time. */
-        const val STALE_MS = 30 * 60 * 1000L
-        const val TIMEOUT_MS = 20_000L
+        private const val STALE_MS = 30 * 60 * 1000L
+        private const val TIMEOUT_MS = 20_000L
         /** LocationManager.FUSED_PROVIDER, whose constant only exists from Android 12. */
-        const val FUSED = "fused"
+        private const val FUSED = "fused"
     }
 }

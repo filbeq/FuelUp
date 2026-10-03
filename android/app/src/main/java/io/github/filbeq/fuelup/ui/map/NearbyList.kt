@@ -159,7 +159,7 @@ fun NearbyList(
             ) {
                 Nearby.RADII_KM.forEach { km ->
                     FilterChip(
-                        selected = settings.radiusKm == km,
+                        selected = state.radiusKm == km,
                         onClick = { onRadiusChange(km) },
                         label = { Text(stringResource(R.string.radius_km, km)) },
                     )
@@ -167,11 +167,11 @@ fun NearbyList(
             }
             if (stations.isEmpty()) {
                 Text(
-                    stringResource(R.string.nearby_empty, settings.radiusKm, choiceLabel(choice)),
+                    stringResource(R.string.nearby_empty, state.radiusKm, choiceLabel(choice)),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(vertical = 12.dp),
                 )
-                Nearby.RADII_KM.firstOrNull { it > settings.radiusKm }?.let { wider ->
+                Nearby.RADII_KM.firstOrNull { it > state.radiusKm }?.let { wider ->
                     OutlinedButton(onClick = { onRadiusChange(wider) }, modifier = Modifier.padding(bottom = 16.dp)) {
                         Text(stringResource(R.string.action_widen_radius, wider))
                     }

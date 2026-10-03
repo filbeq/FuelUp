@@ -123,6 +123,8 @@ fun MapLibreMap(
     onStationClick: (Int) -> Unit,
     /** A tap that hit no station and no cluster. */
     onMapTapEmpty: () -> Unit,
+    /** The user started moving the map (drag, pinch), as opposed to the app. */
+    onUserMovedCamera: () -> Unit,
     /** The user's position (null = unknown or not asked), see [UserLocationLayers]. */
     userPosition: UserPosition?,
     /** "Near me" search circle around [userPosition], or null. */
@@ -140,6 +142,7 @@ fun MapLibreMap(
     val currentColors = rememberUpdatedState(stationColors)
     val currentOnStationClick = rememberUpdatedState(onStationClick)
     val currentOnMapTapEmpty = rememberUpdatedState(onMapTapEmpty)
+    val currentOnUserMovedCamera = rememberUpdatedState(onUserMovedCamera)
     val currentLocationColor = rememberUpdatedState(locationColor)
     val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
@@ -166,6 +169,9 @@ fun MapLibreMap(
                     }
                     if (!hit) currentOnMapTapEmpty.value()
                     hit
+                }
+                map.addOnCameraMoveStartedListener { reason ->
+                    if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) currentOnUserMovedCamera.value()
                 }
                 map.addOnCameraIdleListener {
                     if (width == 0 || height == 0) return@addOnCameraIdleListener

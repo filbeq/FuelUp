@@ -15,6 +15,16 @@ object Nearby {
     val RADII_KM = listOf(5, 10, 20)
     const val DEFAULT_RADIUS_KM = 10
 
+    /** Radius of the view the app opens on when it may use the location (the saved radius is kept for the button). */
+    const val LAUNCH_RADIUS_KM = 5
+
+    /** A fresh fix this far from the one shown re-frames the map (if the user hasn't moved it). */
+    const val REFRAME_KM = 0.5
+
+    /** True if [new] is far enough from [old] to re-frame the map ([REFRAME_KM]). */
+    fun movedEnough(old: UserPosition, new: UserPosition): Boolean =
+        Geo.distanceKm(old.lat, old.lon, new.lat, new.lon) > REFRAME_KM
+
     /**
      * Stations within [radiusKm] of a point that sell the chosen fuel (those in
      * [ranking]). By price: cheapest first, ties by distance, prices "to verify"

@@ -395,20 +395,24 @@ fun MapScreen(
     }
 
     // The "near me" list: recomputed when the position, radius, order, fuel or data change (~ms).
-    val nearby = remember(nearMe.position, nearMe.settings, state.ranking, state.snapshot) {
+    val nearby = remember(nearMe.position, nearMe.settings, nearMe.radiusKm, state.ranking, state.snapshot) {
         val position = nearMe.position
         val snapshot = state.snapshot
         if (position == null || snapshot == null) {
             emptyList()
         } else {
-            Nearby.find(snapshot.stations.stations, state.ranking, position.lat, position.lon, nearMe.settings.radiusKm, nearMe.settings.sort)
+            Nearby.find(snapshot.stations.stations, state.ranking, position.lat, position.lon, nearMe.radiusKm, nearMe.settings.sort)
         }
     }
 
     // A new position or radius: fit the search circle between the top controls and the sheet
     // (or beside the side panel).
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
-    val radiusKm = nearMe.settings.radiusKm
+    val radiusKm = nearMe.radiusKm
+    // Opened by the app at launch: just the list's header, the map in view.
+    LaunchedEffect(nearMe.openedAtLaunch) { if (nearMe.openedAtLaunch) nearbyMinimised = true }
+    // The user dragged or zoomed the map since the last fit: a refined launch fix won't move it back.
+    var userMovedMap by remember { mutableStateOf(false) }
     // The circle the camera last fitted, kept across rotation: a rebuilt screen
     // must not move the camera back to it once the user has moved the map.
     var fittedFix by rememberSaveable { mutableLongStateOf(0L) }
@@ -423,9 +427,13 @@ fun MapScreen(
         val sameCircle = nearMe.fixCount == fittedFix && radiusKm == fittedRadiusKm
         // Same circle: only refine an estimated fit once the list is measured.
         if (sameCircle && (fittedMeasured || !measured)) return@LaunchedEffect
+        // A refined launch fix after the user moved the map: the list follows, the camera stays.
+        val refinedOnly = nearMe.openedAtLaunch && radiusKm == fittedRadiusKm && fittedFix > 0 && nearMe.fixCount != fittedFix
         fittedFix = nearMe.fixCount
         fittedRadiusKm = radiusKm
         fittedMeasured = measured
+        if (refinedOnly && userMovedMap) return@LaunchedEffect
+        userMovedMap = false
         cameraCommand = CameraCommand(
             id = (cameraCommand?.id ?: 0) + 1,
             move = CameraMove.FitCircle(
@@ -435,6 +443,7 @@ fun MapScreen(
                 topPx = topControlsPx,
                 bottomPx = when {
                     wide -> 0
+                    nearbyMinimised && nearbyHeaderPx > 0 -> handleHeightPx + nearbyHeaderPx + navBarPx
                     nearbyCollapsedPx > 0 -> handleHeightPx + nearbyCollapsedPx + navBarPx
                     else -> (mapHeightPx * SHEET_SHARE).roundToInt()
                 },
@@ -619,6 +628,7 @@ fun MapScreen(
                     }
                 },
                 onMapTapEmpty = onMapTapEmpty,
+                onUserMovedCamera = { userMovedMap = true },
                 // Shown only while "near me" is open: closing it clears the map.
                 userPosition = nearMe.position.takeIf { nearMe.open },
                 searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },

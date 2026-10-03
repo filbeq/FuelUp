@@ -51,4 +51,12 @@ class NearbyTest {
         val first = Nearby.find(stations, ranking, 45.0, 9.0, 10, NearbySort.DISTANCE).first()
         assertEquals(1.112, first.distanceKm, 0.01)
     }
+
+    @Test
+    fun aFreshFixReframesOnlyWhenItMovedMoreThan500m() {
+        val old = UserPosition(45.0, 9.0, 1500f)
+        // 0.004° of latitude ≈ 445 m, 0.005° ≈ 556 m.
+        assertEquals(false, Nearby.movedEnough(old, UserPosition(45.004, 9.0, 20f)))
+        assertEquals(true, Nearby.movedEnough(old, UserPosition(45.005, 9.0, 20f)))
+    }
 }

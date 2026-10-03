@@ -1,11 +1,16 @@
 package io.github.filbeq.fuelup.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
@@ -56,6 +61,18 @@ fun FuelUpApp(
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
     var selectedStationId by rememberSaveable { mutableStateOf<Int?>(null) }
     val backStack = rememberNavBackStack(MapRoute)
+    // Once per fresh start (not after a rotation or a restored process): if the
+    // location may already be used, open on the user's position. Never asks.
+    val context = LocalContext.current
+    var launchLocateDone by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (launchLocateDone) return@LaunchedEffect
+        launchLocateDone = true
+        val granted = listOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION).any {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (granted) nearMeViewModel.locateOnLaunch()
+    }
     // Another screen is on top: the map gives up Back and accessibility.
     val mapCovered = backStack.last() != MapRoute
 
