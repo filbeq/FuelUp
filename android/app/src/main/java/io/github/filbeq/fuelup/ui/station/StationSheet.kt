@@ -61,7 +61,7 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Header of the station sheet: what's visible when the sheet is collapsed
- * (name, brand, and the price of the chosen fuel with how it compares).
+ * (name, brand, the price of the chosen fuel with how it compares, and Navigate).
  * [StationSheetBody] follows it when expanded. [ranked] is the station's
  * price for [choice] (null if it doesn't sell it). Other stations at the same
  * spot are listed underneath; tapping one calls [onOpenStation]. The star
@@ -103,7 +103,8 @@ fun StationSheetHeader(
             )
         }
         Spacer(Modifier.height(8.dp))
-        ChosenPrice(choice, ranked)
+        // Navigate on the price's line: there's room, and it's what the collapsed sheet is for.
+        ChosenPrice(choice, ranked) { NavigateButton(details, Modifier.padding(start = 8.dp)) }
         details.sameLocation.forEach { other ->
             TextButton(onClick = { onOpenStation(other.id) }, contentPadding = PaddingValues(0.dp)) {
                 Text(
@@ -136,16 +137,20 @@ private fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/** The chosen fuel's price, its class icon and the comparison in words. */
+/** The chosen fuel's price, its class icon and the comparison in words; [action] at the end of the price's line. */
 @Composable
-private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?) {
+private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?, action: @Composable () -> Unit) {
     val choiceLabel = choiceLabel(choice)
     if (ranked == null) {
-        Text(
-            stringResource(R.string.station_does_not_sell, choiceLabel),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.station_does_not_sell, choiceLabel),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            action()
+        }
         return
     }
     val perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG
@@ -158,7 +163,13 @@ private fun ChosenPrice(choice: FuelChoice, ranked: RankedPrice?) {
             StationIcons.draw(ranked.priceClass, density).asImageBitmap()
         }
         Image(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-        Text(formatPrice(price, perKg), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            formatPrice(price, perKg),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        action()
     }
     Text(
         comparisonText(ranked),
@@ -203,14 +214,23 @@ private fun comparisonText(ranked: RankedPrice): String {
     }
 }
 
+@Composable
+private fun NavigateButton(details: StationDetails, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Button(onClick = { navigateTo(context, details) }, modifier = modifier) {
+        Icon(painterResource(R.drawable.ic_directions), contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.action_navigate))
+    }
+}
+
 /**
- * The rest of the sheet, visible when expanded: address, Navigate, all prices.
+ * The rest of the sheet, visible when expanded: address and all prices.
  * [scrollState] is kept by the caller, so the position survives a rotation
  * between the bottom sheet and the side panel.
  */
 @Composable
 fun StationSheetBody(details: StationDetails, choice: FuelChoice, scrollState: ScrollState, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
     val now = remember(details) { Instant.now() }
     Column(
         modifier
@@ -226,11 +246,6 @@ fun StationSheetBody(details: StationDetails, choice: FuelChoice, scrollState: S
             "${details.address}\n${details.municipality} (${details.province})",
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = { navigateTo(context, details) }) {
-            Icon(painterResource(R.drawable.ic_directions), contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.action_navigate))
-        }
         PriceTable(details, choice, now)
     }
 }
