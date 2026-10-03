@@ -158,6 +158,25 @@ small enough to be tested on a real phone before moving on.
   `AppLocalesMetadataHolderService` on Android < 13 and by the system on 13+,
   in sync with the system per-app picker) and light/dark
   (`setDefaultNightMode`). Compose and Material 3 are unaffected.
+- Wide layout (step 8.3): when the window is >= 600 dp wide (Material width
+  class medium+, `isWideWindow()` in `ui/WindowSize.kt`, needs
+  `material3-adaptive`), the station details and the near-me list are a side
+  panel (`ui/map/SidePanel.kt`) instead of the bottom sheet: left, 360 dp
+  (320 tried on the phone in landscape: rows wrapped, fewer fitted), floating
+  over the full-size map, height follows content (minimised list = header
+  card), × in each header (= Back). Width decides, not orientation; portrait
+  phones keep the sheet unchanged. Back: station → list → closed. Camera moves
+  take the panel into account (`leftPx`; `CameraMove.Reveal` pans a tapped
+  station out from under it). Credits move right of the panel; the date pill
+  centres in the free map. Rotation keeps content, scroll and minimised state;
+  the sheet's state is built from MapScreen's saved `sheetExpanded` (not the
+  sheet's own saver, which restored stale values after a stay in landscape);
+  a scrolled panel comes back as an expanded sheet. Settings/About content is
+  capped at 600 dp, centred (`Modifier.readableWidth()`).
+  MapLibre gotchas found here: a circle fit leaves camera padding behind (so
+  `Show` sets its padding explicitly), and `scrollBy` doesn't end in a
+  camera-idle event (the camera saved for rotation misses it): use
+  `animateCamera`.
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
@@ -323,6 +342,9 @@ personal use on the test phone. Done in step 8 so far:
   stays put across rotation (no jump back to an old "near me" circle).
 - 8.2: fuel selector button + bottom sheet with coloured fuel tiles and legend,
   regular-size location FAB, "Update data now" in Settings.
+- 8.3: side panel on wide windows (landscape phones, tablets), see "Wide
+  layout" above; checked on the phone and a Pixel Tablet emulator, incl.
+  screenrecord of panel open/close and rotations.
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
@@ -342,8 +364,8 @@ Next: the rest of step 8 (see the backlog below).
 
 ### Backlog for step 8 (in no particular order)
 
-- **Sheet in landscape**: the bottom sheet (station and "near me") covers
-  most of the map in landscape; needs a landscape layout (e.g. side panel).
+- **Top bar in landscape** takes ~20% of the height; dropping it there (gear
+  as a floating button, like Google Maps) would show about one more list row.
 - **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
   GeoJSON, style load) and trim.
 - **Search by name** (station name, brand, municipality).
@@ -365,6 +387,12 @@ Next: the rest of step 8 (see the backlog below).
   afterwards (never assume values), then diff: `shared_prefs/settings.xml`,
   the AppCompat language record in `files/`, system `accelerometer_rotation`,
   `user_rotation`, `font_scale` (and radios if airplane mode is used).
+- Tablet tests: emulator AVD `fuelup_tablet` (Pixel Tablet, API 36 x86_64,
+  SDK cmdline-tools installed); never change the phone's `wm size`/density.
+  Setup, x86_64 build and mock location in DEVELOPMENT.md ("Wide screens").
+- Landscape on the phone: `uiautomator` bounds can be clipped/offset near the
+  edges (credits, gear); check against a screenshot before tapping there. MIUI
+  resets `user_rotation` to 0 when the (portrait-only) launcher comes to front.
 - Drive the phone by element text (`uiautomator dump`, tap the node's bounds
   centre), not fixed coordinates: layouts move (sheets, panels). Check the app is
   in front before every step; a reinstall closes it. Screenshots show the

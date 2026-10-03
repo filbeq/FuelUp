@@ -164,7 +164,9 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices, "Update data now"; link to About |
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
-| `java/…/ui/map/MapScreen.kt` | Top bar, map, station sheet (non-modal), credits that follow the sheet |
+| `java/…/ui/map/MapScreen.kt` | Top bar, map, station sheet (non-modal) or side panel on wide windows, credits that follow them |
+| `java/…/ui/map/SidePanel.kt` | The side panel (station details, "near me" list) on wide windows |
+| `java/…/ui/WindowSize.kt` | Wide-window test (Material window size classes) and the 600 dp content width for Settings/About |
 | `java/…/map/MapLibreMap.kt` | MapLibre `MapView` inside Compose (all MapLibre glue) |
 | `java/…/map/MapProvider.kt` | Map style URLs and credits: change `CurrentMapProvider` to switch provider |
 | `java/…/ui/map/MapViewModel.kt` | Loads the cache, then refreshes in the background |
@@ -302,7 +304,8 @@ fuel takes 200–260 ms on a background thread (spread over the CPU cores), plus
 ~35 ms to build the map data; nothing is recomputed while panning.
 
 **Debug builds are arm64-only** (~26 MB instead of ~62 MB). To use an x86_64
-emulator, add `"x86_64"` to `abiFilters` in `app/build.gradle.kts`.
+emulator, add `"x86_64"` to `abiFilters` in `app/build.gradle.kts` for that
+build only (don't commit it).
 
 ### Near me
 
@@ -348,6 +351,59 @@ worse than 500 m), a motorway badge and the report age.
 chosen fuel); Back returns to the list. Tapping empty map leaves the selected
 station, or else lowers the list to its header (title, sort, radius) so the
 circle on the map stays explained. Back: station → list → collapsed → closed.
+
+### Wide screens (landscape, tablets)
+
+When the window is at least **600 dp wide** (Material's "medium" width class:
+phones in landscape, tablets in both orientations, a wide split-screen half),
+the station details and the "near me" list move from the bottom sheet to a
+**side panel** (`ui/map/SidePanel.kt`). Width decides, not orientation
+(`ui/WindowSize.kt`, `isWideWindow()`); portrait phones keep the sheet.
+
+- **Left, 360 dp, floating** over the map with an 8 dp margin, like Google Maps.
+  360 dp is about a portrait phone's width, so the sheet's contents fit as
+  they are. 320 dp was tried on the phone in landscape: list rows wrapped to a
+  third line and fewer fitted.
+- The panel's height follows its content, so the **minimised** list (empty-map
+  tap) is a short card with just the header; tapping the title brings it back.
+- A **close button** (×) at the end of each header does what swiping the sheet
+  away does. In the panel, the list's Price/Distance switch has its own line
+  under the title.
+- **Back:** station → list (same scroll) → closed. No collapsed/expanded step:
+  the panel always shows everything.
+- **Camera:** the near-me circle is framed beside the panel, a station picked
+  from the list is centred in the free part of the map, and a station tapped
+  where the panel opens is panned just enough to stay visible.
+- **Overlays:** the credits line moves to the right of the open panel and the
+  date pill centres in the free part of the map; the fuel button and the
+  my-location button stay on the right.
+- **Rotation** keeps the content (station or list, minimised or not) and the
+  scroll position. The sheet comes back collapsed or expanded as it was, or
+  expanded if the panel was scrolled, so the position stays visible. The
+  sheet state is built from the screen's own saved flags, not from the
+  sheet's built-in saved state, which would bring back how the sheet was
+  before a stay in landscape.
+- **Settings and About** keep their content at most 600 dp wide, centred.
+
+**Tablet emulator** (no tablet needed): with the SDK command-line tools,
+
+```sh
+sdkmanager "system-images;android-36;google_apis;x86_64" emulator
+avdmanager create avd -n fuelup_tablet -k "system-images;android-36;google_apis;x86_64" -d pixel_tablet
+emulator -avd fuelup_tablet
+```
+
+Build with `x86_64` (see above). `adb emu geo fix` didn't reach the app's
+location sources there; a test provider does:
+
+```sh
+adb shell appops set com.android.shell android:mock_location allow
+for p in gps network fused; do
+  adb shell cmd location providers add-test-provider $p
+  adb shell cmd location providers set-test-provider-enabled $p true
+  adb shell cmd location providers set-test-provider-location $p --location 43.66,10.63 --accuracy 20
+done
+```
 
 ### Localization rules
 
