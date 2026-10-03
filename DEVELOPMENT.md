@@ -172,6 +172,8 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/map/MapTopControls.kt` | Search bar, settings button, date pill and fuel button over the top of the map (one row or two) |
 | `java/…/ui/map/MapSearch.kt` | The search bar and its results (full screen, or dropping down on wide windows) |
 | `java/…/data/StationSearch.kt` | Offline search over stations and municipalities: matching and ranking |
+| `java/…/data/Favorites.kt` | Favourite stations: list operations, re-registered stations, their SharedPreferences store |
+| `java/…/ui/map/FavoritesList.kt` | The favourites in the empty search |
 | `java/…/data/PlaceNames.kt` | Municipality names in Italian title case ("Reggio nell'Emilia") |
 | `java/…/ui/map/SidePanel.kt` | The side panel (station details, "near me" list) on wide windows |
 | `java/…/ui/WindowSize.kt` | Wide-window test (Material window size classes) and the 600 dp content width for Settings/About |
@@ -203,6 +205,7 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/theme/` | Fixed FuelUp light/dark palette |
 | `res/values/strings.xml`, `res/values-it/strings.xml` | English and Italian text |
 | `res/xml/locales_config.xml` | Languages offered in Android 13+ settings |
+| `res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml` | What Android backs up: only the favourites |
 
 ### Station data: download, cache, refresh
 
@@ -500,6 +503,47 @@ results drop down under the bar (`ExpandedDockedSearchBar`, at most ⅔ of the
 height) with the map still in view, **only on windows at least 480 dp tall**
 (tablets, `isTallWindow()`). Landscape phones use the full-screen search as in
 portrait: the dropdown fitted one result above the keyboard. Back closes the keyboard, then the search.
+
+### Favourites
+
+The star after a station's name (sheet or side panel) adds it to the
+favourites or removes it: outline = not a favourite, filled = favourite (shape,
+not only colour; ink blue like the rest of the UI, since yellow would be close
+to the price colours).
+
+**Where they show.** When the search opens with nothing typed (like Google
+Maps), the favourites come first, newest first: the chosen fuel's price and
+class, municipality, report age, and the distance when "near me" has found the
+user (whole km from 10 km). Tapping one opens it like a search result. On the
+map, a favourite's marker has a small star at its top right, in the cluster
+colour (dark blue on the light map, pale blue on the dark one) with an outline
+in the opposite tone, so it can't be read as a price class; none on clusters.
+
+**Stored** (`data/Favorites.kt`) as one JSON text in their own
+SharedPreferences file, `favorites`, keyed by MIMIT's station id, with the last
+name, brand, municipality, coordinates and data date seen. Nothing is sent
+anywhere.
+
+**Missing stations.** A favourite that isn't in the current data stays in the
+list: "not in the data since <date>" (the last data date that had it), with a
+star button to remove it; tapping it shows its last known spot as a hollow
+dot. MIMIT gives a station a new id when it is registered again (e.g. a new
+operator), at the same spot: if a station now sits at exactly the favourite's
+coordinates (`StationsFile.stationsAt`, the same lookup as the sheet's "also at
+this location"), the row offers "At this spot now: <name>", which moves the
+star to it, in the same place in the list.
+
+**Backup.** Android's Auto Backup (Google Drive, at most daily, end-to-end
+encrypted with the screen lock on Android 9+) and phone-to-phone transfer
+include **only** `favorites.xml` (`res/xml/backup_rules.xml` for Android 11 and
+older, `res/xml/data_extraction_rules.xml` for 12+). So favourites come back
+after a reinstall from the Play Store or on a new phone; the cached data,
+settings and language don't. An `adb install` doesn't restore by itself; to
+test: `adb shell bmgr backupnow io.github.filbeq.fuelup`, uninstall, install,
+`adb shell bmgr restore io.github.filbeq.fuelup` (needs a backup transport on
+the phone). Play's Data safety form counts as "collected" only what the app
+itself sends off the phone; the backup is Android's, in the user's account, so
+nothing is declared.
 
 ### Municipality names
 

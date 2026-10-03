@@ -48,6 +48,10 @@ app is open, and only on your phone: it is never saved or sent anywhere.
 Approximate location is enough (on Android 12 and newer you can choose it in
 the permission dialog). Without the permission, everything else works.
 
+Favourite stations are stored on your phone. Android may include them (and
+only them) in your phone's own backup to your Google account, so they come
+back after a reinstall or on a new phone; FuelUp itself never sends them.
+
 ## Credits
 
 - **Price data:** Fonte dati: Ministero delle Imprese e del Made in Italy —

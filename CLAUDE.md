@@ -221,6 +221,28 @@ small enough to be tested on a real phone before moving on.
   The ~25 stations dropped for misplaced coordinates are not searchable
   (owner's choice for now; adding them = new optional `unlocated` key, no
   schema bump, fixture regenerated).
+- Favourites (step 8.6): star (`IconToggleButton`, outline/filled, ink blue,
+  never yellow) after the station name in the sheet/panel. Listed when the
+  search opens with an empty query, above the hint (`ui/map/FavoritesList.kt`),
+  newest first: chosen fuel's price + class, municipality, report age, distance
+  when "near me" has a position (whole km from 10 km). Stored as JSON in their
+  own SharedPreferences file `favorites` (`data/Favorites.kt`), keyed by station
+  id, with last-seen labels, coordinates and `lastSeen` data date. A favourite
+  missing from the data is never removed by itself: "not in the data since
+  <date>", a star button to remove it, a tap shows its last spot (hollow dot,
+  the off-map source); if a station now sits at exactly its coordinates
+  (MIMIT re-registered it under a new id), "At this spot now: <name>" moves the
+  star to it in place (`Favorites.successor`/`replace`, same-location lookup
+  `StationsFile.stationsAt`). Map: a small star at the marker's top right, in
+  the cluster colour with an opposite-tone outline (`StationLayers.setFavorites`,
+  filter on the station source, above the selection ring); none on clusters.
+  Recently viewed stations: not done (owner's choice, could be a later step).
+- Backup (step 8.6): Android Auto Backup and device transfer include **only**
+  `sharedpref/favorites.xml` (`res/xml/backup_rules.xml` for Android ≤ 11,
+  `data_extraction_rules.xml` for 12+); cache, settings and language stay out.
+  The app never sends or reads the backup (Android does, in the user's Google
+  account), so the Data safety form still declares nothing collected; recheck
+  Google's wording when filling it in.
 - Municipality names: shown in Italian title case everywhere
   (`data/PlaceNames.kt`, "Reggio nell'Emilia"); station names and addresses
   as MIMIT writes them. 9 names in the data differ from ISTAT's spelling,
@@ -399,6 +421,11 @@ personal use on the test phone. Done in step 8 so far:
 - 8.5: search (stations, municipalities) with a search bar on top of the map,
   municipality names in title case; see "Search" above; checked on the phone
   (portrait/landscape, light/dark map, near-me interplay, screenrecord).
+- 8.6: favourite stations (star, empty-search list, map mark, re-registered
+  stations, backup of the favourites file only); see "Favourites" above;
+  checked on the phone (light/dark map, landscape, near-me distances, faked
+  missing and re-registered favourites). Backup restore itself untested (needs
+  a Play Store install or `bmgr`).
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
@@ -420,7 +447,6 @@ Next: the rest of step 8 (see the backlog below).
 
 - **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
   GeoJSON, style load) and trim.
-- **Favorites** (saved locally, no account).
 - **Publishing prep**:
   - **The name "FuelUp" is taken on the Play Store** (`com.takeapp.fuelup`):
     the app name and the package name (`io.github.filbeq.fuelup`, also the
@@ -478,6 +504,6 @@ Next: the rest of step 8 (see the backlog below).
 7. "Near me" with location permission: my-location button, accuracy disc,
    cheapest-nearby list (5/10/20 km, price/distance).
 8. Later: see "Backlog for step 8" above (layout fixes, map reload, cold
-   start, search, favorites, price history, publishing prep incl. renaming).
+   start, search, favourites, price history, publishing prep incl. renaming).
 
 Finish each step with a working build and a commit before starting the next.
