@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older (Auto Backup): only the favourite stations.
+     Android 12+ uses data_extraction_rules.xml. -->
+<full-backup-content>
+    <include domain="sharedpref" path="favorites.xml" />
+</full-backup-content>
