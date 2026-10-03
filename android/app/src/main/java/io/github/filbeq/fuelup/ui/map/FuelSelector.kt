@@ -59,6 +59,7 @@ import io.github.filbeq.fuelup.data.ServiceMode
 import io.github.filbeq.fuelup.map.StationIcons
 import io.github.filbeq.fuelup.ui.station.choiceLabel
 import io.github.filbeq.fuelup.ui.theme.fuelColor
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 
 /**
  * Floating button over the map, like Google Maps' map-type button, that always
@@ -72,7 +73,7 @@ fun FuelChoiceButton(choice: FuelChoice, onClick: () -> Unit, modifier: Modifier
             .padding(horizontal = 8.dp)
             .defaultMinSize(minHeight = 48.dp)
             .clickable(role = Role.Button, onClickLabel = stringResource(R.string.fuel_selector_action), onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = floatingSurfaceColor(),
         shape = MaterialTheme.shapes.extraLarge,
         shadowElevation = 2.dp,
     ) {

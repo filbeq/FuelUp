@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 
 /**
  * The controls over the top of the full-screen map: the search bar with the
@@ -101,7 +102,7 @@ private fun SettingsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         onClick = onClick,
         modifier = modifier.padding(8.dp).size(SETTINGS_BUTTON_SIZE),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = floatingSurfaceColor(),
         shadowElevation = 2.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {

@@ -51,6 +51,7 @@ import io.github.filbeq.fuelup.data.StationSearch
 import io.github.filbeq.fuelup.map.StationLayers
 import io.github.filbeq.fuelup.ui.station.PriceInfo
 import io.github.filbeq.fuelup.ui.station.formatPrice
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 import java.time.Instant
 import kotlinx.coroutines.launch
 
@@ -65,7 +66,7 @@ fun MapSearchBar(searchBarState: SearchBarState, textFieldState: TextFieldState,
         state = searchBarState,
         inputField = { SearchInput(searchBarState, textFieldState) },
         modifier = modifier,
-        colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = SearchBarDefaults.colors(containerColor = floatingSurfaceColor()),
         shadowElevation = 2.dp,
     )
 }
@@ -95,7 +96,7 @@ fun MapSearchExpanded(
     onStationClick: (Station) -> Unit,
 ) {
     val inputField = @Composable { SearchInput(searchBarState, textFieldState) }
-    val colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    val colors = SearchBarDefaults.colors(containerColor = floatingSurfaceColor())
     val content = @Composable {
         SearchResultsList(ready, query, results, choice, ranking, brands, favorites, onMunicipalityClick, onStationClick)
     }
@@ -118,6 +119,11 @@ private fun SearchInput(searchBarState: SearchBarState, textFieldState: TextFiel
         searchBarState = searchBarState,
         // The results are already there: the keyboard's search key just makes room for them.
         onSearch = { keyboard?.hide() },
+        // The field paints its own background: the same as the bar's.
+        colors = SearchBarDefaults.inputFieldColors(
+            focusedContainerColor = floatingSurfaceColor(),
+            unfocusedContainerColor = floatingSurfaceColor(),
+        ),
         placeholder = { Text(stringResource(R.string.search_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = {
             if (open) {

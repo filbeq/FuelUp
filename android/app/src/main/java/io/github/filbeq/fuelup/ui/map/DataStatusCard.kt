@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 
 /**
  * Small card over the map: the data date ("Prezzi del 30/09, ore 8:00") and,
@@ -41,7 +42,7 @@ fun DataStatusCard(state: MapUiState, onRetry: () -> Unit, modifier: Modifier = 
     Surface(
         // At least as tall as the buttons beside it.
         modifier = modifier.padding(8.dp).widthIn(max = 480.dp).heightIn(min = 48.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = floatingSurfaceColor(),
         shape = MaterialTheme.shapes.medium,
         shadowElevation = 2.dp,
     ) {

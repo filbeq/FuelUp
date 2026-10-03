@@ -107,6 +107,7 @@ import io.github.filbeq.fuelup.ui.theme.LocationColorDark
 import io.github.filbeq.fuelup.ui.theme.LocationColorLight
 import io.github.filbeq.fuelup.ui.theme.LocationHaloDark
 import io.github.filbeq.fuelup.ui.theme.LocationHaloLight
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -714,6 +715,7 @@ fun MapScreen(
             sheetPeekHeight = peekHeight,
             // A shadow like the side panel's, so the sheet floats like the other controls.
             sheetShadowElevation = 3.dp,
+            sheetContainerColor = floatingSurfaceColor(),
             sheetDragHandle = {
                 Box(Modifier.onSizeChanged { handleHeightPx = it.height }) { BottomSheetDefaults.DragHandle() }
             },

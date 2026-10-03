@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 
 /**
  * On wide windows (landscape phones, tablets, split screen) the station details
@@ -61,7 +61,7 @@ fun SidePanel(
                 .width(SIDE_PANEL_WIDTH)
                 .onGloballyPositioned { currentOnRightEdge(it.boundsInWindow().right) },
             shape = MaterialTheme.shapes.large,
-            color = BottomSheetDefaults.ContainerColor,
+            color = floatingSurfaceColor(),
             shadowElevation = 3.dp,
         ) {
             // Insets are handled around the card: the contents' own padding for
