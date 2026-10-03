@@ -76,7 +76,11 @@ jobs:
             echo "::error::Signed APK not found (was the release build left unsigned?)"; exit 1
           fi
           "$apksigner" verify --print-certs "$apk" | tee certs.txt
-          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certs.txt)
+          # Tolerant of apksigner's output format (it varies between versions).
+          cert=$(grep -m 1 -oiE 'certificate SHA-256 digest: *[0-9a-f]{64}' certs.txt | grep -oiE '[0-9a-f]{64}$' || true)
+          if [ -z "$cert" ]; then
+            echo "::error::Signing certificate SHA-256 not found in the apksigner output"; exit 1
+          fi
           mkdir dist
           cp "$apk" "dist/FuelUp-$VERSION.apk"
           cp android/app/build/outputs/mapping/release/mapping.txt "dist/mapping-$VERSION.txt"
