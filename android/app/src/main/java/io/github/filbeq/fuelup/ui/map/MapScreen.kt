@@ -20,11 +20,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -425,14 +425,14 @@ fun MapScreen(
             // Lift the credits and the button above the sheet so they're never covered.
             val aboveSheet = Modifier.offset { IntOffset(0, -(mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt()) }
             MapAttributionBar(onClick = onOpenAbout, modifier = Modifier.align(Alignment.BottomStart).then(aboveSheet))
-            SmallFloatingActionButton(
+            FloatingActionButton(
                 onClick = {
                     nearbyMinimised = false
                     onOpenNearMe()
                     requestLocation()
                 },
                 // Above the credits line, at the right edge.
-                modifier = Modifier.align(Alignment.BottomEnd).then(aboveSheet).padding(end = 12.dp, bottom = 40.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).then(aboveSheet).padding(end = 16.dp, bottom = 40.dp),
             ) {
                 Icon(painterResource(R.drawable.ic_my_location), contentDescription = stringResource(R.string.action_my_location))
             }
