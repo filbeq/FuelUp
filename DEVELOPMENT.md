@@ -131,7 +131,7 @@ system's Settings → Apps → FuelUp → Language.
 | Path (under `android/app/src/main/`) | What it does |
 |---|---|
 | `java/…/MainActivity.kt` | Entry point: initialises MapLibre, sets the theme |
-| `java/…/ui/FuelUpApp.kt` | Screens and back stack (Navigation 3: map, settings, About); keeps the camera and the selected station |
+| `java/…/ui/FuelUpApp.kt` | Screens and back stack (Navigation 3: settings, About drawn over the map, which stays alive underneath); keeps the camera and the selected station |
 | `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices; link to About |
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
@@ -211,6 +211,7 @@ Release builds will be faster.
 | UI frames while the cache is parsed | 1–2% janky, 99th percentile 15–36 ms |
 | Map frames while panning (SurfaceFlinger) | steady 16.7 ms (60 fps), none missed |
 | Cold start | one long frame (~750 ms) from MapLibre start-up, with or without data |
+| Back from Settings/About to the map | before: map rebuilt, 1.04–2.16 s (median 1.27 s, 10 runs) until fully drawn; now: no redraw needed, the map is complete in every frame of the ~0.5 s fade (3 Oct 2026) |
 
 To see the timings yourself: `adb logcat -s FuelUpPerf` (debug builds only).
 Debug builds also enable StrictMode, which logs any disk or network access on

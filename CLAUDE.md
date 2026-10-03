@@ -128,6 +128,14 @@ small enough to be tested on a real phone before moving on.
   `AboutRoute`) in `ui/FuelUpApp.kt`; system Back pops it. The map's ViewModel,
   camera and selected station live above the navigation, so they survive other
   screens. The station sheet is part of the map screen and gets Back first.
+- Map kept alive (step 8.1): `MapScreen` is composed outside `NavDisplay`,
+  underneath it; the `MapRoute` entry is an empty placeholder and other screens
+  are drawn over the map, so Back never rebuilds the MapView (was ~1.3 s of
+  style + data reload). While covered (`covered` = back-stack top isn't the
+  map) the map's Back handler is off and its semantics are cleared (TalkBack).
+  The MapView is **not** paused while covered: MapLibre draws only on change
+  (CPU ~0% behind Settings), and pausing it flashed dark on Back after the app
+  had been in the background (seen in a screen recording).
 - Settings (step 6b, controls 6c): gear icon top right → Settings → About.
   Theme: switch "follow system theme" + "dark theme" (enabled only when the
   first is off); map style: "automatic map style" + "dark map", same pattern.
@@ -280,7 +288,8 @@ small enough to be tested on a real phone before moving on.
 ## Status (2026-10-03)
 
 Steps 1–7 are done, committed and pushed; CI green. The app is in daily
-personal use on the test phone. Next: step 8 (see the backlog below).
+personal use on the test phone. Step 8.1 (map kept alive across screens) is
+done. Next: the rest of step 8 (see the backlog below).
 
 ### Open issues (known, not yet fixed)
 
@@ -293,6 +302,10 @@ personal use on the test phone. Next: step 8 (see the backlog below).
 - The user's centre mark can hide a nearby cluster's "from" pill (by design:
   colliding labels are left out rather than half-covered).
 - Lint's only warning is `OldTargetApi` (targetSdk 36): accepted for now.
+- After a rotation (or any recreation) the camera re-fits the last "near me"
+  circle even when "near me" is closed (`MapScreen`'s fit effect only checks
+  `nearMe.position`); in landscape the fit logs a harmless MapLibre "padding
+  greater than map's height" error.
 
 ### Backlog for step 8 (in no particular order)
 
@@ -301,9 +314,6 @@ personal use on the test phone. Next: step 8 (see the backlog below).
   next to the chips).
 - **Sheet in landscape**: the bottom sheet (station and "near me") covers
   most of the map in landscape; needs a landscape layout (e.g. side panel).
-- **Map reload**: the map view is rebuilt (~1 s style reload) when returning
-  from Settings/About; keep the map alive before adding frequently used
-  screens (favorites, search).
 - **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
   GeoJSON, style load) and trim.
 - **Search by name** (station name, brand, municipality).
