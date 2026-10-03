@@ -267,8 +267,8 @@ small enough to be tested on a real phone before moving on.
     list, back at the top when the sheet collapses.
   - Empty-map tap: with a station selected, leaves it (back to the list as
     it was, or nothing); otherwise lowers the list to its header: title,
-    order and radius (kept, so the circle on the map stays explained). Title, drag up or the
-    location button bring it back. Back: station → list → collapsed → closed;
+    order and radius (kept, so the circle on the map stays explained).
+    Title, drag up or the location button bring it back. Back: station → list → collapsed → closed;
     minimised → closed.
   - Play Store: no background-location declaration needed; location never
     leaves the phone, so the Data safety form declares nothing collected.
