@@ -318,8 +318,14 @@ small enough to be tested on a real phone before moving on.
 ## Status (2026-10-03)
 
 Steps 1–7 are done, committed and pushed; CI green. The app is in daily
-personal use on the test phone. Step 8.1 (map kept alive across screens) and
-8.2 (fuel selector button, regular location FAB, "Update data now") are done.
+personal use on the test phone. Done in step 8 so far:
+- 8.1: map kept alive across screens (no reload after Settings/About); camera
+  stays put across rotation (no jump back to an old "near me" circle).
+- 8.2: fuel selector button + bottom sheet with coloured fuel tiles and legend,
+  regular-size location FAB, "Update data now" in Settings.
+- Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
+  alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
+
 Next: the rest of step 8 (see the backlog below).
 
 ### Open issues (known, not yet fixed)
@@ -354,12 +360,19 @@ Next: the rest of step 8 (see the backlog below).
 ### Working notes for the next session
 
 - Test phone: Redmi Note 9 Pro, Android 11 (MIUI), adb device `cd0e2646`,
-  1080×2400. It is the owner's daily phone: settings changed for a test
-  (theme, map style, fuel, radius) must be restored; the owner may be using
-  it during tests.
+  1080×2400. It is the owner's daily phone and the owner may be using it during
+  tests. Before testing, snapshot the real state and restore exactly that
+  afterwards (never assume values), then diff: `shared_prefs/settings.xml`,
+  the AppCompat language record in `files/`, system `accelerometer_rotation`,
+  `user_rotation`, `font_scale` (and radios if airplane mode is used).
+- Drive the phone by element text (`uiautomator dump`, tap the node's bounds
+  centre), not fixed coordinates: layouts move (sheets, panels). Check the app is
+  in front before every step; a reinstall closes it. Screenshots show the
+  owner's area: keep them local, don't publish them.
 - `gh` is not installed: watch CI through the GitHub REST API
-  (`/repos/filbeq/FuelUp/actions/runs?head_sha=…`); the publish workflow can
-  be run by hand from the Actions tab ("Run workflow").
+  (`/repos/filbeq/FuelUp/actions/runs?head_sha=…`, run jobs/steps under
+  `/actions/runs/<id>/jobs`). Without a token, workflows can't be started from
+  here: the owner clicks "Run workflow" in the Actions tab.
 - App settings live in `shared_prefs/settings.xml`; edit them for tests with
   `adb shell "run-as io.github.filbeq.fuelup sed -i '…' shared_prefs/settings.xml"`
   (quote the whole command, or the device shell treats `<` as a redirect).
