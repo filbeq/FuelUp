@@ -1,3 +1,5 @@
+import java.util.Properties
+
 /**
  * versionCode derived from versionName "MAJOR.MINOR.PATCH": MAJOR * 10000 +
  * MINOR * 100 + PATCH (0.1.0 -> 100, 1.2.3 -> 10203). Android only installs an
@@ -12,6 +14,21 @@ fun versionCodeOf(versionName: String): Int {
     val (major, minor, patch) = parts.map { it!! }
     return major * 10000 + minor * 100 + patch
 }
+
+/**
+ * Release signing, kept out of git. CI passes environment variables (from the
+ * repository secrets); locally, android/keystore.properties (git-ignored) holds
+ * the same values. With neither, the release APK is built unsigned.
+ * The keystore is PKCS12, so the key's password is the keystore's password.
+ */
+val keystoreProperties = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
+fun signingValue(envName: String, propertyName: String): String? =
+    System.getenv(envName)?.takeIf { it.isNotEmpty() } ?: keystoreProperties.getProperty(propertyName)
+
+val releaseStoreFile = signingValue("RELEASE_KEYSTORE_FILE", "storeFile")
 
 val appVersionName = "0.1.0" // bump for every release, see DEVELOPMENT.md "Releases"
 
@@ -31,6 +48,17 @@ android {
         targetSdk = 36
         versionName = appVersionName
         versionCode = versionCodeOf(appVersionName)
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = signingValue("RELEASE_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("RELEASE_KEY_ALIAS", "keyAlias")
+                keyPassword = storePassword
+            }
+        }
     }
 
     buildTypes {
@@ -55,6 +83,7 @@ android {
             // add ~26 MB; reconsider for a Play Store bundle, where each phone
             // downloads only its own ABI.
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

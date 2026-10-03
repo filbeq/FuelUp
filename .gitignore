@@ -21,9 +21,11 @@ captures/
 *.apk
 *.aab
 
-# Signing keys
+# Signing keys and their passwords (see DEVELOPMENT.md "Releases")
 *.jks
 *.keystore
+*.p12
+keystore.properties
 
 # IDE
 .idea/
