@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.BuildConfig
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.map.CurrentMapProvider
+import io.github.filbeq.fuelup.ui.readableWidth
 
 private const val DATASET_URL =
     "https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti"
@@ -55,6 +56,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .readableWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

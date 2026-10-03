@@ -1,7 +1,11 @@
 package io.github.filbeq.fuelup.ui
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 
 /**
@@ -14,3 +18,10 @@ import androidx.window.core.layout.WindowSizeClass
 fun isWideWindow(): Boolean =
     currentWindowAdaptiveInfo().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
+/**
+ * Keeps a screen's content (settings rows, text) at most 600 dp wide, centred:
+ * on a landscape phone or a tablet, a switch at the far end of a 1200 dp row is
+ * hard to link to its label. No effect on portrait phones. Put it after the
+ * scroll modifier, so the whole width still scrolls.
+ */
+fun Modifier.readableWidth(): Modifier = wrapContentWidth().widthIn(max = 600.dp)

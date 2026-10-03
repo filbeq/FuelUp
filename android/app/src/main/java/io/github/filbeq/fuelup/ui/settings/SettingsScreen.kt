@@ -53,6 +53,7 @@ import io.github.filbeq.fuelup.data.themeForDark
 import io.github.filbeq.fuelup.data.themeForFollowSystem
 import io.github.filbeq.fuelup.ui.map.ManualUpdate
 import io.github.filbeq.fuelup.ui.map.formatPricesAt
+import io.github.filbeq.fuelup.ui.readableWidth
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -92,7 +93,7 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).readableWidth()) {
             SectionTitle(R.string.settings_theme)
             SwitchRow(
                 label = R.string.settings_follow_system_theme,
