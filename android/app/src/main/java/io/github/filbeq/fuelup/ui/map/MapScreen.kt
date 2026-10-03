@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,10 +34,12 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,11 +76,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
+import io.github.filbeq.fuelup.data.Municipality
 import io.github.filbeq.fuelup.data.Nearby
 import io.github.filbeq.fuelup.data.NearbySort
+import io.github.filbeq.fuelup.data.SearchResults
 import io.github.filbeq.fuelup.data.isDark
 import io.github.filbeq.fuelup.map.CameraCommand
 import io.github.filbeq.fuelup.map.CameraMove
@@ -88,6 +94,7 @@ import io.github.filbeq.fuelup.map.MapLabels
 import io.github.filbeq.fuelup.map.MapLibreMap
 import io.github.filbeq.fuelup.map.StationColors
 import io.github.filbeq.fuelup.map.styleUrl
+import io.github.filbeq.fuelup.ui.isTallWindow
 import io.github.filbeq.fuelup.ui.isWideWindow
 import io.github.filbeq.fuelup.ui.station.StationDetails
 import io.github.filbeq.fuelup.ui.station.StationSheetBody
@@ -100,7 +107,12 @@ import io.github.filbeq.fuelup.ui.theme.LocationColorLight
 import io.github.filbeq.fuelup.ui.theme.LocationHaloDark
 import io.github.filbeq.fuelup.ui.theme.LocationHaloLight
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The map with the station details and the "near me" list beside it: in a
@@ -316,6 +328,28 @@ fun MapScreen(
         FuelChoiceSheet(choice = state.choice, onChoiceChange = onChoiceChange, onDismiss = { fuelPanelOpen = false })
     }
 
+    // Search: the text survives rotation; open = keyboard and results over the map.
+    val searchBarState = rememberSearchBarState()
+    val searchText = rememberTextFieldState()
+    val searchOpen = searchBarState.targetValue == SearchBarValue.Expanded
+    // Results in a dropdown under the bar only where several fit above the
+    // keyboard (tablets); landscape phones get the full-screen search, like portrait.
+    val searchDocked = wide && isTallWindow()
+    // Latest results, with the text they are for. Recomputed off the main thread on
+    // every keystroke (the previous search is dropped), and when the fuel or data change.
+    var searchResults by remember { mutableStateOf<Pair<String, SearchResults>?>(null) }
+    val currentCamera by rememberUpdatedState(camera)
+    LaunchedEffect(state.search, state.ranking) {
+        val search = state.search ?: return@LaunchedEffect
+        snapshotFlow { searchText.text.toString() }.collectLatest { query ->
+            val results = withContext(Dispatchers.Default) {
+                PerfLog.time("search '$query'") {
+                    search.search(query, state.ranking, currentCamera.latitude, currentCamera.longitude)
+                }
+            }
+            searchResults = query to results
+        }
+    }
     // Where the sheet's top edge is, so the map credits can stay above it.
     var sheetTopPx by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     var mapBottomPx by remember { mutableFloatStateOf(0f) }
@@ -325,7 +359,6 @@ fun MapScreen(
     var mapLeftPx by remember { mutableFloatStateOf(0f) }
     // Height of the controls over the top of the map (fuel chips, status card).
     var topControlsPx by remember { mutableIntStateOf(0) }
-    var mapWidthPx by remember { mutableIntStateOf(0) }
     // The system bars and camera cutout beside the map (landscape).
     val layoutDirection = LocalLayoutDirection.current
     val safeLeftPx = WindowInsets.safeDrawing.getLeft(density, layoutDirection)
@@ -335,18 +368,20 @@ fun MapScreen(
     val panelCoverPx = if (wide) safeLeftPx + with(density) { (SIDE_PANEL_WIDTH + SIDE_PANEL_MARGIN * 2).roundToPx() } else 0
     // The same, as drawn right now, for the controls over the map.
     val panelShownPx = (panelRightPx - mapLeftPx).coerceAtLeast(0f).roundToInt()
-    // The top controls' width beside the panel's place, open or not: opening
-    // it doesn't rearrange them halfway through its slide.
-    val topControlsRowWidth = if (wide) with(density) { (mapWidthPx - panelCoverPx - safeRightPx).toDp() } else null
+    // Height of the search bar's row; on wide windows the side panel starts below it.
+    var searchRowPx by remember { mutableIntStateOf(0) }
+    val safeTopPx = WindowInsets.safeDrawing.getTop(density)
 
     // The map runs under the status bar: its icons follow the map's darkness
     // (dark icons on the light map), and the app theme while another screen is on top.
     val appDark = isSystemInDarkTheme()
     val mapIsDark = mapStyle.isDark(darkTheme = appDark)
     val view = LocalView.current
-    LaunchedEffect(activity, covered, mapIsDark, appDark) {
+    // The full-screen search covers the map like another screen.
+    val mapHidden = covered || (searchOpen && !searchDocked)
+    LaunchedEffect(activity, mapHidden, mapIsDark, appDark) {
         val window = activity?.window ?: return@LaunchedEffect
-        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !(if (covered) appDark else mapIsDark)
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !(if (mapHidden) appDark else mapIsDark)
     }
 
     // The "near me" list: recomputed when the position, radius, order, fuel or data change (~ms).
@@ -398,6 +433,70 @@ fun MapScreen(
         )
     }
 
+    // Waits until the sheet has finished moving (after a selection opened, lowered
+    // or closed it), so the free part of the map is known.
+    suspend fun awaitSheetSettled() {
+        val sheet = sheetState ?: return
+        // The selection reaches the sheet's own effect a frame or two later.
+        repeat(2) { withFrameNanos { } }
+        withTimeoutOrNull(SHEET_SETTLE_TIMEOUT_MS) { snapshotFlow { sheet.currentValue == sheet.targetValue }.first { it } }
+        withFrameNanos { }
+    }
+    val freeBottomPx = { if (wide) 0 else (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt() }
+    val moveCamera = { move: CameraMove -> cameraCommand = CameraCommand(id = (cameraCommand?.id ?: 0) + 1, move = move) }
+
+    // A station from the "near me" list or the search: selected as by a tap,
+    // then shown in the free part of the map, zoomed in enough to show it alone.
+    val openStation = { lat: Double, lon: Double, id: Int ->
+        selectStation(id)
+        scope.launch {
+            // From the expanded sheet: show the station collapsed (its chosen-fuel price).
+            if (sheetState?.currentValue == SheetValue.Expanded) sheetState.partialExpand()
+            awaitSheetSettled()
+            moveCamera(CameraMove.Show(lat, lon, minZoom = STATION_ZOOM, topPx = topControlsPx, bottomPx = freeBottomPx(), leftPx = panelCoverPx))
+        }
+    }
+    // A municipality from the search: like a tap on empty map (leave the station,
+    // lower the "near me" list), then frame all its stations.
+    val openMunicipality = { municipality: Municipality ->
+        onMapTapEmpty()
+        scope.launch {
+            awaitSheetSettled()
+            moveCamera(
+                CameraMove.FitPoints(
+                    municipality.mainStations().map { doubleArrayOf(it.lat, it.lon) },
+                    maxZoom = STATION_ZOOM + 1,
+                    topPx = topControlsPx,
+                    bottomPx = freeBottomPx(),
+                    leftPx = if (nearMe.open) panelCoverPx else 0,
+                ),
+            )
+        }
+    }
+
+    if (!covered) {
+        val query = searchText.text.toString()
+        MapSearchExpanded(
+            searchBarState = searchBarState,
+            textFieldState = searchText,
+            docked = searchDocked,
+            ready = state.search != null,
+            query = query,
+            results = searchResults?.takeIf { it.first == query }?.second,
+            choice = state.choice,
+            ranking = state.ranking,
+            brands = state.snapshot?.stations?.brands.orEmpty(),
+            onMunicipalityClick = { municipality ->
+                scope.launch { searchBarState.animateToCollapsed() }
+                openMunicipality(municipality)
+            },
+            onStationClick = { station ->
+                scope.launch { searchBarState.animateToCollapsed() }
+                openStation(station.lat, station.lon, station.id)
+            },
+        )
+    }
+
     // The sheet's or the side panel's contents; the panel has a close button.
     val panelContent: @Composable (closeButton: (@Composable () -> Unit)?) -> Unit = { closeButton ->
         val station = shownDetails
@@ -423,30 +522,7 @@ fun MapScreen(
                 onExpand = { nearbyMinimised = false },
                 onRadiusChange = onRadiusChange,
                 onSortChange = onSortChange,
-                onStationClick = { item ->
-                    selectStation(item.station.id)
-                    scope.launch {
-                        if (sheetState != null) {
-                            // From the expanded list: show the station collapsed (its
-                            // chosen-fuel price), as from the collapsed list.
-                            if (sheetState.currentValue == SheetValue.Expanded) sheetState.partialExpand()
-                            // Let the sheet settle, so the free part of the map is known.
-                            withFrameNanos { }
-                        }
-                        // Bring it into the free part of the map, zoomed in enough to show it alone.
-                        cameraCommand = CameraCommand(
-                            id = (cameraCommand?.id ?: 0) + 1,
-                            move = CameraMove.Show(
-                                item.station.lat,
-                                item.station.lon,
-                                minZoom = STATION_ZOOM,
-                                topPx = topControlsPx,
-                                bottomPx = if (wide) 0 else (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt(),
-                                leftPx = panelCoverPx,
-                            ),
-                        )
-                    }
-                },
+                onStationClick = { item -> openStation(item.station.lat, item.station.lon, item.station.id) },
                 onMeasured = { headerPx, collapsedPx ->
                     nearbyHeaderPx = headerPx
                     nearbyCollapsedPx = collapsedPx
@@ -476,7 +552,6 @@ fun MapScreen(
                     mapBottomPx = bounds.bottom
                     mapLeftPx = bounds.left
                     mapHeightPx = it.size.height
-                    mapWidthPx = it.size.width
                 },
         ) {
             MapLibreMap(
@@ -495,6 +570,8 @@ fun MapScreen(
                 mapLabels = mapLabels(),
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
                 selectedStationId = selectedStationId,
+                // A station picked in the search that has no marker (doesn't sell the chosen fuel).
+                selectedOffMap = details?.takeIf { it.id !in state.ranking }?.let { it.lat to it.lon },
                 onStationClick = { id ->
                     selectStation(id)
                     // A station under the side panel's place or the controls: bring it out beside / below them.
@@ -530,16 +607,17 @@ fun MapScreen(
                 onRetry = onRetry,
                 onOpenFuel = { fuelPanelOpen = true },
                 onOpenSettings = onOpenSettings,
-                rowWidth = topControlsRowWidth,
+                searchBar = { MapSearchBar(searchBarState, searchText) },
+                wide = wide,
+                onSearchRowHeight = { searchRowPx = it },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     // Measured with the insets, from the top of the map: includes the status bar.
                     .onSizeChanged { topControlsPx = it.height }
-                    // Below the status bar, clear of the cutout and a side navigation bar;
-                    // side panel open: beside it (the pill centres in the free part of the map).
+                    // Below the status bar, clear of the cutout and a side navigation bar.
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                     .padding(
-                        start = with(density) { maxOf(panelShownPx, safeLeftPx).toDp() },
+                        start = with(density) { safeLeftPx.toDp() },
                         end = with(density) { safeRightPx.toDp() },
                     ),
             )
@@ -576,8 +654,10 @@ fun MapScreen(
                     onRightEdge = { panelRightPx = it },
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom))
-                        .padding(SIDE_PANEL_MARGIN),
+                        // Under the search bar, which is aligned with it.
+                        .padding(top = with(density) { (safeTopPx + searchRowPx).toDp() })
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Bottom))
+                        .padding(start = SIDE_PANEL_MARGIN, end = SIDE_PANEL_MARGIN, bottom = SIDE_PANEL_MARGIN),
                 ) { closeButton ->
                     panelContent(closeButton)
                 }
@@ -652,6 +732,9 @@ private const val STATION_ZOOM = 14.0
 
 /** Room the credits and the my-location button (and its margin) need below the top controls. */
 private val LIFT_CLEARANCE = 150.dp
+
+/** Longest wait for the sheet to stop moving before a camera move. */
+private const val SHEET_SETTLE_TIMEOUT_MS = 1_500L
 
 /** Share of the map's height the sheet is assumed to cover before the list is measured. */
 private const val SHEET_SHARE = 0.4f

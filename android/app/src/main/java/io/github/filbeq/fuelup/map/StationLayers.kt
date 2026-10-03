@@ -60,10 +60,12 @@ import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.layers.PropertyFactory.textFont
 import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyValue
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import kotlin.math.hypot
 
@@ -110,6 +112,10 @@ object StationLayers {
     private const val PRICE_LAYER_ID = "fuelup-station-price"
     private const val STATION_LAYER_ID = "fuelup-station"
     private const val SELECTED_LAYER_ID = "fuelup-selected"
+    /** A selected station without a marker (it doesn't sell the chosen fuel): its own point. */
+    private const val OFF_MAP_SOURCE_ID = "fuelup-selected-off-map"
+    private const val OFF_MAP_DOT_LAYER_ID = "fuelup-selected-off-map-dot"
+    private const val OFF_MAP_RING_LAYER_ID = "fuelup-selected-off-map-ring"
     private const val ID_PROPERTY = "id"
     private const val CLASS_PROPERTY = "c"
     private const val PRICE_PROPERTY = "p"
@@ -290,14 +296,28 @@ object StationLayers {
         style.addLayer(
             CircleLayer(SELECTED_LAYER_ID, SOURCE_ID)
                 .withFilter(selectedFilter(NO_STATION))
-                .withProperties(
-                    circleRadius(13f),
-                    circleOpacity(0f),
-                    circleStrokeColor(colors.selected),
-                    circleStrokeWidth(3f),
-                ),
+                .withProperties(*selectedRing(colors)),
         )
+        // A station picked in the search that has no marker (it doesn't sell the
+        // chosen fuel): a plain hollow dot, like "not compared", inside the same ring.
+        style.addSource(GeoJsonSource(OFF_MAP_SOURCE_ID))
+        style.addLayer(
+            CircleLayer(OFF_MAP_DOT_LAYER_ID, OFF_MAP_SOURCE_ID).withProperties(
+                circleRadius(5f),
+                circleColor(colors.labelHalo),
+                circleStrokeColor(colors.labelText),
+                circleStrokeWidth(2f),
+            ),
+        )
+        style.addLayer(CircleLayer(OFF_MAP_RING_LAYER_ID, OFF_MAP_SOURCE_ID).withProperties(*selectedRing(colors)))
     }
+
+    private fun selectedRing(colors: StationColors) = arrayOf<PropertyValue<*>>(
+        circleRadius(13f),
+        circleOpacity(0f),
+        circleStrokeColor(colors.selected),
+        circleStrokeWidth(3f),
+    )
 
     /** A value per cluster size: [smallest] below the first [CLUSTER_SIZES] step, then [byRadius] of each radius. */
     private fun clusterStep(smallest: Expression, byRadius: (Float) -> Expression) = step(
@@ -366,6 +386,13 @@ object StationLayers {
     }
 
     private fun selectedFilter(id: Int) = all(not(has("point_count")), eq(get(ID_PROPERTY), id))
+
+    /** Shows a selected station that has no marker at [lat], [lon]; null clears it. */
+    fun setSelectedOffMap(style: Style, position: Pair<Double, Double>?) {
+        val source = style.getSourceAs<GeoJsonSource>(OFF_MAP_SOURCE_ID) ?: return
+        val features = listOfNotNull(position?.let { (lat, lon) -> Feature.fromGeometry(Point.fromLngLat(lon, lat)) })
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
 
     /**
      * Handles a tap at [point] (screen pixels): a station → [onStationClick] with its

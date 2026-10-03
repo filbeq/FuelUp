@@ -155,4 +155,26 @@
     <string name="action_widen_radius">Search within %1$d km</string>
     <string name="class_not_compared">Not compared</string>
     <string name="action_show_list">Show the list</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search stations or towns</string>
+    <string name="search_intro">Find stations by name, brand or address, and towns by name.</string>
+    <plurals name="search_too_short">
+        <item quantity="one">Type at least %1$d letter.</item>
+        <item quantity="other">Type at least %1$d letters.</item>
+    </plurals>
+    <string name="search_preparing">Preparing the search…</string>
+    <string name="search_no_results">Nothing found for “%1$s”.</string>
+    <plurals name="search_more">
+        <item quantity="one">Showing %1$d of %2$d station: type more to narrow the search.</item>
+        <item quantity="other">Showing %1$d of %2$d stations: type more to narrow the search.</item>
+    </plurals>
+    <plurals name="search_station_count">
+        <item quantity="one">%1$d station</item>
+        <item quantity="other">%1$d stations</item>
+    </plurals>
+    <string name="place_with_province" translatable="false">%1$s (%2$s)</string>
+    <string name="station_not_selling">Doesn\'t sell %1$s</string>
+    <string name="action_clear_search">Clear search</string>
+    <string name="action_close_search">Close search</string>
 </resources>

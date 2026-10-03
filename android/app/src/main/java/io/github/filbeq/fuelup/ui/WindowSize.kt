@@ -19,6 +19,15 @@ fun isWideWindow(): Boolean =
     currentWindowAdaptiveInfo().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
 /**
+ * The window is at least 480 dp tall (Material's "medium" height class or more):
+ * tablets, not phones in landscape. Only then is there room for a list under
+ * the search bar with the keyboard open (see `MapSearchExpanded`).
+ */
+@Composable
+fun isTallWindow(): Boolean =
+    currentWindowAdaptiveInfo().windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+
+/**
  * Keeps a screen's content (settings rows, text) at most 600 dp wide, centred:
  * on a landscape phone or a tablet, a switch at the far end of a 1200 dp row is
  * hard to link to its label. No effect on portrait phones. Put it after the

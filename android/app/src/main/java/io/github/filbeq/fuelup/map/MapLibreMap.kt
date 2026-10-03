@@ -79,6 +79,18 @@ sealed interface CameraMove {
      * the top, pan just enough to bring it out; else don't move.
      */
     data class Reveal(val lat: Double, val lon: Double, val leftPx: Int, val topPx: Int) : CameraMove
+
+    /**
+     * Frame all [points] (`[lat, lon]` pairs, e.g. a municipality's stations) in the free
+     * area inside [topPx], [bottomPx] and [leftPx], zoomed in at most to [maxZoom].
+     */
+    class FitPoints(
+        val points: List<DoubleArray>,
+        val maxZoom: Double,
+        val topPx: Int,
+        val bottomPx: Int,
+        val leftPx: Int = 0,
+    ) : CameraMove
 }
 
 /**
@@ -103,6 +115,8 @@ fun MapLibreMap(
     labelLanguage: String,
     /** Station drawn as selected (highlight ring), or null. */
     selectedStationId: Int?,
+    /** Where the selected station is when it has no marker of its own (`lat` to `lon`), else null. */
+    selectedOffMap: Pair<Double, Double>?,
     /** Called with the id of a tapped station. Taps on clusters zoom in. */
     onStationClick: (Int) -> Unit,
     /** A tap that hit no station and no cluster. */
@@ -188,6 +202,10 @@ fun MapLibreMap(
         loadedStyle?.let { StationLayers.setSelected(it, selectedStationId) }
     }
 
+    LaunchedEffect(loadedStyle, selectedOffMap) {
+        loadedStyle?.let { StationLayers.setSelectedOffMap(it, selectedOffMap) }
+    }
+
     LaunchedEffect(loadedStyle, userPosition, searchRadiusKm) {
         loadedStyle?.let { UserLocationLayers.setData(it, userPosition, searchRadiusKm) }
     }
@@ -247,6 +265,27 @@ private fun moveCamera(map: MapLibreMap, move: CameraMove) {
                 .build()
             map.animateCamera(CameraUpdateFactory.newCameraPosition(position))
         }
+        is CameraMove.FitPoints -> {
+            val side = (FIT_MARGIN_DP * density).toInt()
+            val padding = intArrayOf(move.leftPx + side, move.topPx + side, side, move.bottomPx + side)
+            val first = move.points.firstOrNull() ?: return
+            // One station (or all at one spot): no area to fit, centre it.
+            val fitted = if (move.points.all { it[0] == first[0] && it[1] == first[1] }) {
+                null
+            } else {
+                map.getCameraForLatLngBounds(
+                    LatLngBounds.Builder().includes(move.points.map { LatLng(it[0], it[1]) }).build(),
+                    padding,
+                )
+            }
+            val position = CameraPosition.Builder()
+                .target(fitted?.target ?: LatLng(first[0], first[1]))
+                .zoom(minOf(fitted?.zoom ?: move.maxZoom, move.maxZoom))
+                // Set every time, like Show: a circle fit leaves its own padding behind.
+                .padding(padding[0].toDouble(), padding[1].toDouble(), padding[2].toDouble(), padding[3].toDouble())
+                .build()
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(position))
+        }
         is CameraMove.Reveal -> {
             val point = map.projection.toScreenLocation(LatLng(move.lat, move.lon))
             // Some room beside the panel and under the controls, so the marker isn't squeezed against them.
@@ -265,3 +304,6 @@ private fun moveCamera(map: MapLibreMap, move: CameraMove) {
 }
 
 private const val REVEAL_MARGIN_DP = 48
+
+/** Room around a framed municipality, so its outermost stations aren't squeezed against the edges. */
+private const val FIT_MARGIN_DP = 32

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -51,6 +53,8 @@ import io.github.filbeq.fuelup.data.Nearby
 import io.github.filbeq.fuelup.data.NearbySort
 import io.github.filbeq.fuelup.data.NearbyStation
 import io.github.filbeq.fuelup.data.PriceClass
+import io.github.filbeq.fuelup.data.RankedPrice
+import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.map.StationIcons
 import io.github.filbeq.fuelup.ui.station.PriceInfo
 import io.github.filbeq.fuelup.ui.station.choiceLabel
@@ -195,22 +199,57 @@ private fun NearbyRow(
     onClick: (NearbyStation) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val station = item.station
-    val brand = brands.getOrElse(station.brand) { "" }
+    StationRow(
+        station = item.station,
+        brand = brands.getOrElse(item.station.brand) { "" },
+        price = item.price,
+        choice = choice,
+        where = formatDistance(item.distanceKm, approximate, LocalConfiguration.current.locales[0]),
+        now = now,
+        onClick = { onClick(item) },
+        modifier = modifier,
+    )
+}
+
+/**
+ * A station in a list ("near me", search): class icon, name, brand and [where]
+ * (distance or municipality), motorway badge, class and report age, price of
+ * [choice]. Without a [price] (it doesn't sell the choice), a plain pump and "Doesn't sell …".
+ */
+@Composable
+internal fun StationRow(
+    station: Station,
+    brand: String,
+    price: RankedPrice?,
+    choice: FuelChoice,
+    where: String,
+    now: Instant,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val density = LocalDensity.current.density
-    val icon = remember(item.price.priceClass, density) { StationIcons.draw(item.price.priceClass, density).asImageBitmap() }
-    val price = PriceInfo(item.price.priceMilli, Instant.ofEpochSecond(item.price.updatedEpochSeconds))
+    val icon = remember(price?.priceClass, density) { price?.let { StationIcons.draw(it.priceClass, density).asImageBitmap() } }
+    val info = price?.let { PriceInfo(it.priceMilli, Instant.ofEpochSecond(it.updatedEpochSeconds)) }
     Column(modifier) {
         HorizontalDivider()
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(role = Role.Button) { onClick(item) }
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Image(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            if (icon != null) {
+                Image(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            } else {
+                Icon(
+                    painterResource(R.drawable.ic_local_gas_station),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Column(Modifier.weight(1f)) {
                 Text(
                     station.name.ifEmpty { brand },
@@ -220,11 +259,7 @@ private fun NearbyRow(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        listOfNotNull(
-                            brand.takeIf { station.name.isNotEmpty() && it.isNotEmpty() },
-                            formatDistance(item.distanceKm, approximate, LocalConfiguration.current.locales[0]),
-                        )
-                            .joinToString(" · "),
+                        listOfNotNull(brand.takeIf { station.name.isNotEmpty() && it.isNotEmpty() }, where).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -235,16 +270,22 @@ private fun NearbyRow(
                     if (station.motorway == 1) MotorwayBadge()
                 }
                 Text(
-                    "${classText(item.price.priceClass)} · ${reportedText(price, now)}",
+                    if (price != null && info != null) {
+                        "${classText(price.priceClass)} · ${reportedText(info, now)}"
+                    } else {
+                        stringResource(R.string.station_not_selling, choiceLabel(choice))
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                formatPrice(price, perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            if (info != null) {
+                Text(
+                    formatPrice(info, perKg = choice.fuel == FuelKind.CNG || choice.fuel == FuelKind.LNG),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }

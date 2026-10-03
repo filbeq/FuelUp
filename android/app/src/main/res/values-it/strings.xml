@@ -146,4 +146,28 @@
     <string name="action_widen_radius">Cerca entro %1$d km</string>
     <string name="class_not_compared">Non confrontato</string>
     <string name="action_show_list">Mostra l\'elenco</string>
+
+    <!-- Ricerca -->
+    <string name="search_hint">Cerca distributori o comuni</string>
+    <string name="search_intro">Cerca i distributori per nome, marchio o indirizzo, e i comuni per nome.</string>
+    <plurals name="search_too_short">
+        <item quantity="one">Scrivi almeno %1$d lettera.</item>
+        <item quantity="many">Scrivi almeno %1$d lettere.</item>
+        <item quantity="other">Scrivi almeno %1$d lettere.</item>
+    </plurals>
+    <string name="search_preparing">Preparazione della ricerca…</string>
+    <string name="search_no_results">Nessun risultato per “%1$s”.</string>
+    <plurals name="search_more">
+        <item quantity="one">%1$d distributori su %2$d: scrivi di più per restringere la ricerca.</item>
+        <item quantity="many">%1$d distributori su %2$d: scrivi di più per restringere la ricerca.</item>
+        <item quantity="other">%1$d distributori su %2$d: scrivi di più per restringere la ricerca.</item>
+    </plurals>
+    <plurals name="search_station_count">
+        <item quantity="one">%1$d distributore</item>
+        <item quantity="many">%1$d distributori</item>
+        <item quantity="other">%1$d distributori</item>
+    </plurals>
+    <string name="station_not_selling">Non vende %1$s</string>
+    <string name="action_clear_search">Cancella la ricerca</string>
+    <string name="action_close_search">Chiudi la ricerca</string>
 </resources>

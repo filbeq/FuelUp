@@ -15,21 +15,24 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 
 /**
- * The controls over the top of the full-screen map: the data date pill, the
- * fuel button and the settings button, all 48 dp tall.
+ * The controls over the top of the full-screen map: the search bar with the
+ * settings button beside it, the data date pill and the fuel button.
  *
- * All on one line when they fit in [rowWidth] (landscape phone, tablet), which
- * saves a row of height: the pill centred, or as close to it as the buttons allow.
- * Otherwise (portrait phone, split screen) the pill is centred on top with the
- * gear on its right, and the fuel button under the gear, like Google Maps'
- * layer button. [rowWidth] is the width the controls have beside the open side
- * panel, so they don't rearrange while it slides in; null = the width given.
- * The caller pads this for the system bars and the side panel.
+ * Narrow windows (portrait phone): the search bar across the top with the gear
+ * on its right; under it the date pill on the left and the fuel button on the
+ * right (the fuel button drops to a third row if both don't fit).
+ * Wide windows ([wide]: landscape phone, tablet): one row. The search bar is on
+ * the left, as wide as the side panel and aligned with it (the panel opens
+ * under it), then the gear; the pill is centred in the rest of the row and the
+ * fuel button is at the right end. If they don't fit, the pill and the fuel
+ * button move to a second row, on the right.
+ *
+ * [onSearchRowHeight] reports the height of the search bar's row (the side panel
+ * starts below it). The caller pads this for the system bars.
  */
 @Composable
 fun MapTopControls(
@@ -37,45 +40,56 @@ fun MapTopControls(
     onRetry: () -> Unit,
     onOpenFuel: () -> Unit,
     onOpenSettings: () -> Unit,
-    rowWidth: Dp?,
+    searchBar: @Composable () -> Unit,
+    wide: Boolean,
+    onSearchRowHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Layout(
         contents = listOf(
+            // 4 dp above and below: as tall as the gear with its padding, centres aligned.
+            { Box(Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)) { searchBar() } },
             { DataStatusCard(state = state, onRetry = onRetry) },
             { FuelChoiceButton(choice = state.choice, onClick = onOpenFuel) },
             { SettingsButton(onClick = onOpenSettings) },
         ),
         modifier = modifier.fillMaxWidth(),
-    ) { (pillPart, fuelPart, gearPart), constraints ->
+    ) { (barPart, pillPart, fuelPart, gearPart), constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val width = constraints.maxWidth
         val gear = gearPart.first().measure(loose)
         val fuel = fuelPart.first().measure(loose)
+        // The side panel's column (margin + width), or all the width the gear leaves.
+        val barWidth = (if (wide) (SIDE_PANEL_MARGIN + SIDE_PANEL_WIDTH).roundToPx() else width - gear.width).coerceIn(0, width)
+        val bar = barPart.first().measure(loose.copy(minWidth = barWidth, maxWidth = barWidth))
+        val rowHeight = maxOf(bar.height, gear.height)
+        onSearchRowHeight(rowHeight)
+        // The fuel button has no padding above and below: 8 dp lines it up with the pill.
+        val fuelDrop = 8.dp.roundToPx()
+        val gearX = if (wide) barWidth else width - gear.width
+        // Where the pill and the fuel button go, on the search row (wide only) or below it.
+        val restStart = if (wide) gearX + gear.width else 0
         val pillWanted = pillPart.first().maxIntrinsicWidth(Constraints.Infinity)
-        val oneRow = pillWanted + fuel.width + gear.width <= (rowWidth?.roundToPx() ?: width)
-        // The fuel button's own padding is only at its sides.
-        val gap = 8.dp.roundToPx()
-        if (oneRow) {
-            val pillSpace = (width - fuel.width - gear.width).coerceAtLeast(0)
-            val pill = pillPart.first().measure(loose.copy(maxWidth = pillSpace))
-            val height = maxOf(pill.height, gear.height, gap + fuel.height)
-            layout(width, height) {
-                // Centred in the free map, shifted left only to keep clear of the buttons.
-                pill.place(((width - pill.width) / 2).coerceAtMost(pillSpace - pill.width).coerceAtLeast(0), 0)
-                fuel.place(pillSpace, gap)
-                gear.place(width - gear.width, 0)
+        val sameRow = wide && pillWanted + fuel.width <= width - restStart
+        val left = if (sameRow) restStart else 0
+        val pillSpace = (width - left - fuel.width).coerceAtLeast(0)
+        val pill = pillPart.first().measure(loose.copy(maxWidth = if (wide) pillSpace else width))
+        val pillFitsBeside = pill.width + fuel.width <= width - left
+        val pillY = if (sameRow) 0 else rowHeight
+        val fuelY = if (pillFitsBeside) pillY + fuelDrop else pillY + pill.height
+        val height = maxOf(rowHeight, pillY + pill.height, fuelY + fuel.height)
+        layout(width, height) {
+            bar.place(0, (rowHeight - bar.height) / 2)
+            gear.place(gearX, (rowHeight - gear.height) / 2)
+            val pillX = when {
+                // Centred in the rest of the row, shifted left only to keep clear of the fuel button.
+                sameRow -> ((restStart + width - pill.width) / 2).coerceAtMost(pillSpace + left - pill.width).coerceAtLeast(left)
+                // On the right, next to the fuel button (wide), or on the left under the bar (narrow).
+                wide && pillFitsBeside -> width - fuel.width - pill.width
+                else -> 0
             }
-        } else {
-            // An empty slot as wide as the gear on the left keeps the pill centred.
-            val pillSpace = (width - 2 * gear.width).coerceAtLeast(0)
-            val pill = pillPart.first().measure(loose.copy(maxWidth = pillSpace))
-            val rowHeight = maxOf(pill.height, gear.height)
-            layout(width, rowHeight + fuel.height) {
-                pill.place(gear.width + (pillSpace - pill.width) / 2, 0)
-                gear.place(width - gear.width, 0)
-                fuel.place(width - fuel.width, rowHeight)
-            }
+            pill.place(pillX, pillY)
+            fuel.place(width - fuel.width, fuelY)
         }
     }
 }
