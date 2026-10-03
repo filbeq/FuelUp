@@ -260,13 +260,14 @@ small enough to be tested on a real phone before moving on.
     measured), sort Price (default; "to verify" last) / Distance, both saved.
     Rows: class icon and words, price, brand, distance as the crow flies
     (whole km when the fix is worse than 500 m), motorway badge, report age.
-    A row selects the station and shows it; Back returns to the list.
+    A row selects the station and shows it (the sheet is lowered first, so
+    the station opens collapsed with the chosen fuel); Back returns to the
+    list (collapsed, even if it was expanded).
     Only the header (title, sort, radius) is fixed; all rows scroll in one
     list, back at the top when the sheet collapses.
   - Empty-map tap: with a station selected, leaves it (back to the list as
     it was, or nothing); otherwise lowers the list to its header: title,
-    order and radius (kept,
-    so the circle on the map stays explained). Title, drag up or the
+    order and radius (kept, so the circle on the map stays explained). Title, drag up or the
     location button bring it back. Back: station → list → collapsed → closed;
     minimised → closed.
   - Play Store: no background-location declaration needed; location never
@@ -275,6 +276,62 @@ small enough to be tested on a real phone before moving on.
 - Cluster "from" prices exclude prices "to verify" and duty-free Livigno
   (`StationLayers.fromPrice`).
 - No analytics, no tracking, no personal data collected.
+
+## Status (2026-10-03)
+
+Steps 1–7 are done, committed and pushed; CI green. The app is in daily
+personal use on the test phone. Next: step 8 (see the backlog below).
+
+### Open issues (known, not yet fixed)
+
+- "Refused once, the system will ask again" permission path is untested on a
+  device: on the test phone a single refusal was already final (USER_FIXED
+  flag left by earlier grant/revoke tests). The "refused for good" path and
+  its settings button are verified.
+- Approximate vs precise choice in the Android 12+ permission dialog is
+  untested (the only test phone runs Android 11).
+- The user's centre mark can hide a nearby cluster's "from" pill (by design:
+  colliding labels are left out rather than half-covered).
+- Lint's only warning is `OldTargetApi` (targetSdk 36): accepted for now.
+
+### Backlog for step 8 (in no particular order)
+
+- **Crowded top rows**: fuel chips, legend and Self/Servito take three rows
+  over the map; find a more compact layout (e.g. legend folded away, mode
+  next to the chips).
+- **Sheet in landscape**: the bottom sheet (station and "near me") covers
+  most of the map in landscape; needs a landscape layout (e.g. side panel).
+- **Map reload**: the map view is rebuilt (~1 s style reload) when returning
+  from Settings/About; keep the map alive before adding frequently used
+  screens (favorites, search).
+- **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
+  GeoJSON, style load) and trim.
+- **Search by name** (station name, brand, municipality).
+- **Favorites** (saved locally, no account).
+- **Publishing prep**:
+  - **The name "FuelUp" is taken on the Play Store** (`com.takeapp.fuelup`):
+    the app name and the package name (`io.github.filbeq.fuelup`, also the
+    Kotlin package) must change before publishing.
+  - Privacy policy URL (required for every app; the README's privacy section
+    can become a page on GitHub Pages); Data safety form: nothing collected.
+  - Release signing (keystore kept out of git), release build check on all
+    ABIs, store listing, screenshots, IODL 2.0 attribution in the listing.
+
+### Working notes for the next session
+
+- Test phone: Redmi Note 9 Pro, Android 11 (MIUI), adb device `cd0e2646`,
+  1080×2400. It is the owner's daily phone: settings changed for a test
+  (theme, map style, fuel, radius) must be restored; the owner may be using
+  it during tests.
+- `gh` is not installed: watch CI through the GitHub REST API
+  (`/repos/filbeq/FuelUp/actions/runs?head_sha=…`); the publish workflow can
+  be run by hand from the Actions tab ("Run workflow").
+- App settings live in `shared_prefs/settings.xml`; edit them for tests with
+  `adb shell "run-as io.github.filbeq.fuelup sed -i '…' shared_prefs/settings.xml"`
+  (quote the whole command, or the device shell treats `<` as a redirect).
+- Background waits: never `pgrep -f` a string that is also in the waiting
+  command (it matches itself); never leave a bare `cat` in a pipeline (it
+  waits on stdin forever).
 
 ## Roadmap (MVP first, one step at a time)
 
@@ -294,9 +351,7 @@ small enough to be tested on a real phone before moving on.
    stations at the same spot, cluster count + "from" price pill.
 7. "Near me" with location permission: my-location button, accuracy disc,
    cheapest-nearby list (5/10/20 km, price/distance).
-8. Later: favorites, search, price history, UI polish, Play Store prep.
-   Note: the map view is rebuilt (~1 s style reload) when returning from
-   another screen. Before adding frequently used screens (favorites, search),
-   find a way to keep the map alive.
+8. Later: see "Backlog for step 8" above (layout fixes, map reload, cold
+   start, search, favorites, price history, publishing prep incl. renaming).
 
 Finish each step with a working build and a commit before starting the next.
