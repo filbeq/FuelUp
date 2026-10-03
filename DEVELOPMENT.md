@@ -6,7 +6,8 @@ app is, see the [README](README.md).
 ```
 pipeline/   Python data pipeline: download MIMIT data, clean it, write JSON
 android/    Android app (Kotlin, Jetpack Compose, MapLibre)
-.github/    GitHub Actions workflow that publishes the data to GitHub Pages
+.github/    GitHub Actions: CI on every push (tests, lint, contract check) and
+            the workflow that publishes the data to GitHub Pages
 ```
 
 ## Data pipeline
@@ -266,6 +267,51 @@ fuel takes 200–260 ms on a background thread (spread over the CPU cores), plus
 
 **Debug builds are arm64-only** (~26 MB instead of ~62 MB). To use an x86_64
 emulator, add `"x86_64"` to `abiFilters` in `app/build.gradle.kts`.
+
+### Near me
+
+The my-location button (bottom right of the map) finds the user once and lists
+the stations around them that sell the chosen fuel.
+
+**Permission.** Asked only when the button is tapped, foreground only (never
+background). Approximate and precise are requested together: on Android 12+
+the user picks, and approximate is enough. Approximate alone was tried first,
+but on Android ≤ 11 such apps can't use GPS and the network source alone stayed
+silent on the test phone. Without permission the app works as before; refused,
+refused for good (button to the app's settings page), location off (button to
+location settings) and "no position" each get an explanation in the sheet.
+
+**Position** (`data/UserLocation.kt`). One fix per tap, no tracking, through
+the platform `LocationManager` (no Google Play services):
+
+1. A last known position at most **2 minutes** old is used at once.
+2. Otherwise the fused, network and (if precise is allowed) GPS sources are
+   asked together; the first answer wins.
+3. Nothing within **20 s** → a last known position up to **30 minutes** old,
+   else "no position".
+
+The position stays in memory only: it is never saved or sent anywhere, so the
+Play Store Data safety form declares nothing collected.
+
+**On the map** (`map/UserLocationLayers.kt`). A translucent disc as large as
+the reported accuracy with a small centre mark (no precise-looking dot), and
+the search radius as a solid circle on a soft halo. Colours follow the map's
+darkness, like the clusters. Disc and circle lie under the stations; the centre
+mark is drawn above them, so price labels that would collide with it are left
+out rather than half-covered. Shown only while "near me" is open.
+
+**The list** (`data/Nearby.kt`, `ui/map/NearbyList.kt`). Radius 5, 10 or 20 km
+as the crow flies (no roads); default 10 km: ~40 stations at the median place
+and at least 3 in 99% of places (measured). Sort by price (default; ties by
+distance, prices "to verify" always last) or by distance (ties by price).
+Radius and sort are saved in `SharedPreferences`. Each row shows the price
+class in icon and words, price, brand, distance (whole km when the fix is
+worse than 500 m), a motorway badge and the report age.
+
+**Sheet behaviour.** Tapping a row opens that station (collapsed, with the
+chosen fuel); Back returns to the list. Tapping empty map leaves the selected
+station, or else lowers the list to its header (title, sort, radius) so the
+circle on the map stays explained. Back: station → list → collapsed → closed.
 
 ### Localization rules
 
