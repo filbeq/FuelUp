@@ -6,6 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,6 +45,7 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -413,6 +417,10 @@ fun MapScreen(
     val radiusKm = nearMe.radiusKm
     // Opened by the app at launch: just the list's header, the map in view.
     LaunchedEffect(nearMe.openedAtLaunch) { if (nearMe.openedAtLaunch) nearbyMinimised = true }
+    // The map's rotation and tilt, updated on every camera frame; the compass shows while either isn't zero.
+    var bearing by remember { mutableFloatStateOf(0f) }
+    var tilt by remember { mutableFloatStateOf(0f) }
+    val mapTurned by remember { derivedStateOf { minOf(bearing, 360f - bearing) > TURNED_DEGREES || tilt > TURNED_DEGREES } }
     // The user dragged or zoomed the map since the last fit: a refined launch fix won't move it back.
     var userMovedMap by remember { mutableStateOf(false) }
     // The circle the camera last fitted, kept across rotation: a rebuilt screen
@@ -631,6 +639,10 @@ fun MapScreen(
                 },
                 onMapTapEmpty = onMapTapEmpty,
                 onUserMovedCamera = { userMovedMap = true },
+                onBearingTilt = { b, t ->
+                    bearing = b
+                    tilt = t
+                },
                 // Shown only while "near me" is open: closing it clears the map.
                 userPosition = nearMe.position.takeIf { nearMe.open },
                 searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },
@@ -680,6 +692,8 @@ fun MapScreen(
                 onClick = onOpenAbout,
                 modifier = Modifier.align(Alignment.BottomStart).then(if (wide) besidePanel else aboveSheet),
             )
+            // The my-location button's place: above the sheet, or clear of a side navigation bar.
+            val fabPlace = if (wide) Modifier.offset { IntOffset(-safeRightPx, 0) } else aboveSheet
             FloatingActionButton(
                 onClick = {
                     nearbyMinimised = false
@@ -690,10 +704,23 @@ fun MapScreen(
                 // Above the credits line, at the right edge.
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .then(if (wide) Modifier.offset { IntOffset(-safeRightPx, 0) } else aboveSheet)
+                    .then(fabPlace)
                     .padding(end = 16.dp, bottom = 40.dp),
             ) {
                 Icon(painterResource(R.drawable.ic_my_location), contentDescription = stringResource(R.string.action_my_location))
+            }
+            // Our compass, above the my-location button and moving with it; only while the map is turned or tilted.
+            AnimatedVisibility(
+                visible = mapTurned,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .then(fabPlace)
+                    // Centred over the 56 dp button, 12 dp above it.
+                    .padding(end = 16.dp + (56.dp - COMPASS_SIZE) / 2, bottom = 40.dp + 56.dp + 12.dp),
+            ) {
+                CompassButton(bearing = { bearing }, onClick = { moveCamera(CameraMove.ResetNorth) })
             }
             if (wide) {
                 SidePanel(
@@ -781,8 +808,11 @@ private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_COARSE_LOC
 /** Zoom at which stations show one by one (clusters end at 13). */
 private const val STATION_ZOOM = 14.0
 
-/** Room the credits and the my-location button (and its margin) need below the top controls. */
-private val LIFT_CLEARANCE = 150.dp
+/** Room the credits, the my-location button and the compass (and margins) need below the top controls. */
+private val LIFT_CLEARANCE = 200.dp
+
+/** Rotation or tilt (degrees) from which the map counts as turned: the compass shows. */
+private const val TURNED_DEGREES = 0.5f
 
 /** Longest wait for the sheet to stop moving before a camera move. */
 private const val SHEET_SETTLE_TIMEOUT_MS = 1_500L

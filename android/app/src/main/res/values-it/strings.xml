@@ -176,4 +176,5 @@
     <string name="favorites_empty">Tocca la stella su un distributore per ritrovarlo qui.</string>
     <string name="favorite_missing_since">Non presente nei dati dal %1$s</string>
     <string name="favorite_at_spot_now">Ora in questo punto: %1$s</string>
+    <string name="action_reset_north">Riorienta a nord</string>
 </resources>

@@ -91,6 +91,9 @@ sealed interface CameraMove {
         val bottomPx: Int,
         val leftPx: Int = 0,
     ) : CameraMove
+
+    /** Back to north up and no tilt, around the same centre (the compass button). */
+    data object ResetNorth : CameraMove
 }
 
 /**
@@ -125,6 +128,8 @@ fun MapLibreMap(
     onMapTapEmpty: () -> Unit,
     /** The user started moving the map (drag, pinch), as opposed to the app. */
     onUserMovedCamera: () -> Unit,
+    /** The map's rotation (degrees clockwise from north, 0–360) and tilt (degrees), on every camera frame. */
+    onBearingTilt: (bearing: Float, tilt: Float) -> Unit,
     /** The user's position (null = unknown or not asked), see [UserLocationLayers]. */
     userPosition: UserPosition?,
     /** "Near me" search circle around [userPosition], or null. */
@@ -143,6 +148,7 @@ fun MapLibreMap(
     val currentOnStationClick = rememberUpdatedState(onStationClick)
     val currentOnMapTapEmpty = rememberUpdatedState(onMapTapEmpty)
     val currentOnUserMovedCamera = rememberUpdatedState(onUserMovedCamera)
+    val currentOnBearingTilt = rememberUpdatedState(onBearingTilt)
     val currentLocationColor = rememberUpdatedState(locationColor)
     val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
@@ -158,6 +164,8 @@ fun MapLibreMap(
             // Credits are shown by our own attribution bar (see MapProvider).
             .attributionEnabled(false)
             .logoEnabled(false)
+            // Our own compass button replaces it (MapLibre's sat under the search bar).
+            .compassEnabled(false)
         MapView(context, options).apply {
             onCreate(null)
             getMapAsync { map ->
@@ -172,6 +180,10 @@ fun MapLibreMap(
                 }
                 map.addOnCameraMoveStartedListener { reason ->
                     if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) currentOnUserMovedCamera.value()
+                }
+                map.addOnCameraMoveListener {
+                    val position = map.cameraPosition
+                    currentOnBearingTilt.value(position.bearing.toFloat(), position.tilt.toFloat())
                 }
                 map.addOnCameraIdleListener {
                     if (width == 0 || height == 0) return@addOnCameraIdleListener
@@ -297,6 +309,10 @@ private fun moveCamera(map: MapLibreMap, move: CameraMove) {
                 .padding(padding[0].toDouble(), padding[1].toDouble(), padding[2].toDouble(), padding[3].toDouble())
                 .build()
             map.animateCamera(CameraUpdateFactory.newCameraPosition(position))
+        }
+        CameraMove.ResetNorth -> {
+            val position = CameraPosition.Builder(map.cameraPosition).bearing(0.0).tilt(0.0).build()
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(position), 400)
         }
         is CameraMove.Reveal -> {
             val point = map.projection.toScreenLocation(LatLng(move.lat, move.lon))

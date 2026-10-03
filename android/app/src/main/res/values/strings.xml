@@ -183,4 +183,5 @@
     <string name="favorites_empty">Tap the star on a station to keep it here.</string>
     <string name="favorite_missing_since">Not in the data since %1$s</string>
     <string name="favorite_at_spot_now">At this spot now: %1$s</string>
+    <string name="action_reset_north">Reset to north</string>
 </resources>
