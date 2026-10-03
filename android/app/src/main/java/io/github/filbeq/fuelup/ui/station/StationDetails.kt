@@ -7,6 +7,8 @@ import io.github.filbeq.fuelup.data.PriceEntry
 import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationsFile
+import io.github.filbeq.fuelup.data.station
+import io.github.filbeq.fuelup.data.stationsAt
 import java.text.NumberFormat
 import java.time.Instant
 import java.util.Locale
@@ -73,14 +75,9 @@ fun fuelTitle(row: FuelRow, kindLabel: String): Pair<String, String?> = when {
 
 /** Details of station [id], or null if it isn't in the data. */
 fun Snapshot.stationDetails(id: Int): StationDetails? {
-    val stations = stations.stations
-    // Stations are sorted by id (the pipeline writes them that way).
-    val index = stations.binarySearch { it.id.compareTo(id) }
-    if (index < 0) return null
-    val station = stations[index]
-    // A plain scan: ~20k comparisons, once per tap.
-    val sameLocation = stations
-        .filter { it.id != id && it.lat == station.lat && it.lon == station.lon }
+    val station = stations.station(id) ?: return null
+    val sameLocation = stations.stationsAt(station.lat, station.lon)
+        .filter { it.id != id }
         .map { OtherStation(it.id, it.name.ifEmpty { this.stations.brands.getOrElse(it.brand) { "" } }) }
     return station.toDetails(this.stations).copy(sameLocation = sameLocation)
 }

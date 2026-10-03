@@ -70,6 +70,19 @@ class Station(
     @SerialName("f") val prices: List<LongArray>,
 )
 
+/** Station [id], or null if it isn't in the data. */
+fun StationsFile.station(id: Int): Station? {
+    // Stations are sorted by id (the pipeline writes them that way).
+    val index = stations.binarySearch { it.id.compareTo(id) }
+    return if (index < 0) null else stations[index]
+}
+
+/**
+ * Stations at exactly these coordinates (two registrations at one site, or a
+ * station registered again under a new id). A plain scan: ~20k comparisons.
+ */
+fun StationsFile.stationsAt(lat: Double, lon: Double): List<Station> = stations.filter { it.lat == lat && it.lon == lon }
+
 /** Positions inside each [Station.prices] entry. */
 object PriceEntry {
     const val FUEL = 0

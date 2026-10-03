@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import io.github.filbeq.fuelup.BuildConfig
 import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.data.AppSettingsStore
+import io.github.filbeq.fuelup.data.FavoriteStation
+import io.github.filbeq.fuelup.data.Favorites
+import io.github.filbeq.fuelup.data.FavoritesStore
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelChoiceStore
 import io.github.filbeq.fuelup.data.HttpFetcher
@@ -16,6 +19,7 @@ import io.github.filbeq.fuelup.data.Snapshot
 import io.github.filbeq.fuelup.data.StationRepository
 import io.github.filbeq.fuelup.data.StationSearch
 import io.github.filbeq.fuelup.data.standardFuelIndices
+import io.github.filbeq.fuelup.data.station
 import io.github.filbeq.fuelup.map.StationLayers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +49,8 @@ data class MapUiState(
     val manualUpdate: ManualUpdate = ManualUpdate.Idle,
     /** Search over [snapshot]; null until built (off the main thread, after the map data). */
     val search: StationSearch? = null,
+    /** Starred stations, newest first; kept on the phone (see [FavoritesStore]). */
+    val favorites: List<FavoriteStation> = emptyList(),
 )
 
 /** State of the "Update data now" button in Settings. */
@@ -88,6 +94,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         FuelChoiceStore(application.getSharedPreferences(AppSettingsStore.PREFS_NAME, Application.MODE_PRIVATE))
     }
 
+    private val favoritesStore by lazy {
+        FavoritesStore(application.getSharedPreferences(FavoritesStore.PREFS_NAME, Application.MODE_PRIVATE))
+    }
+
     private val _state = MutableStateFlow(MapUiState())
     val state: StateFlow<MapUiState> = _state.asStateFlow()
 
@@ -96,12 +106,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     init {
         refreshJob = viewModelScope.launch {
             val choice = withContext(Dispatchers.IO) { choiceStore.load() }
+            val favorites = withContext(Dispatchers.IO) { favoritesStore.load() }
             val cached = withContext(Dispatchers.IO) { PerfLog.timeWithHeap("cache") { repository.loadCached() } }
             val prepared = cached?.let { prepare(it, choice) }
             val lastChecked = withContext(Dispatchers.IO) { repository.lastMetaCheck() }
             _state.value = MapUiState(
                 cached, prepared?.geoJson, DataStatus.Loading, choice, prepared?.ranking.orEmpty(), lastChecked,
+                favorites = favorites,
             )
+            cached?.let { refreshFavorites(it) }
             cached?.let { viewModelScope.launch { buildSearch(it) } }
             refresh(force = false)
         }
@@ -125,6 +138,37 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /** The star in the station sheet: adds station [id] to the favourites, or removes it. */
+    fun toggleFavorite(id: Int) {
+        val file = _state.value.snapshot?.stations ?: return
+        val station = file.station(id) ?: return
+        updateFavorites { Favorites.toggle(it, station, file) }
+    }
+
+    /** Removes a favourite (also one missing from the data). */
+    fun removeFavorite(id: Int) = updateFavorites { Favorites.remove(it, id) }
+
+    /** Moves the star from a favourite missing from the data to station [newId], registered at the same spot. */
+    fun replaceFavorite(old: FavoriteStation, newId: Int) {
+        val file = _state.value.snapshot?.stations ?: return
+        val station = file.station(newId) ?: return
+        updateFavorites { Favorites.replace(it, old, station, file) }
+    }
+
+    /** Names, positions and "last seen" dates from newly shown data. */
+    private fun refreshFavorites(snapshot: Snapshot) = updateFavorites { Favorites.refresh(it, snapshot.stations) }
+
+    private fun updateFavorites(change: (List<FavoriteStation>) -> List<FavoriteStation>) {
+        val old = _state.value.favorites
+        val new = change(old)
+        if (new == old) return
+        _state.update { it.copy(favorites = new) }
+        viewModelScope.launch(saveDispatcher) { favoritesStore.save(new) }
+    }
+
+    // One at a time, so quick taps are saved in order.
+    private val saveDispatcher = Dispatchers.IO.limitedParallelism(1)
 
     /** "Retry" button: check the server now, ignoring the hourly limit. */
     fun retry() {
@@ -171,7 +215,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
             }.copy(lastChecked = lastChecked)
         }
-        if (result is RefreshResult.Updated) viewModelScope.launch { buildSearch(result.snapshot) }
+        if (result is RefreshResult.Updated) {
+            refreshFavorites(result.snapshot)
+            viewModelScope.launch { buildSearch(result.snapshot) }
+        }
         return result
     }
 
