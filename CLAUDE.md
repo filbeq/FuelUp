@@ -179,12 +179,9 @@ small enough to be tested on a real phone before moving on.
   `animateCamera`.
 - Full-screen map (step 8.4): no top bar on the map screen (Settings and About
   keep theirs, with Back); the map runs edge to edge under the status bar.
-  Top controls (`ui/map/MapTopControls.kt`), all 48 dp tall: date pill, fuel
-  button, round gear button. One row when they fit in the width beside the
-  panel's place (landscape phone, tablet; measured, not a fixed width, so the
-  panel's slide never rearranges them), pill centred as far as the buttons
-  allow; else pill centred with the gear on its right and the fuel button
-  under the gear (portrait). Status bar: icons follow the map's darkness (app
+  Top controls (`ui/map/MapTopControls.kt`): since step 8.5 the search bar
+  with the gear beside it, then date pill and fuel button (see "Search").
+  Status bar: icons follow the map's darkness (app
   theme while Settings/About is on top) over a faint scrim in the map's tone;
   icon colour alone was tried, place names clashed with the clock. Insets:
   controls and side panel use `safeDrawing` (status bar, cutout, side
@@ -194,6 +191,36 @@ small enough to be tested on a real phone before moving on.
   `Reveal` also moves a tapped station down out from under the controls.
   A plain `Box` replaced the wide layout's `Scaffold`: Material text colour
   must then be set explicitly on translucent surfaces (`contentColor`).
+- Search (step 8.5): offline, over the data on the phone (no geocoding):
+  stations by name/brand/address/municipality/province, and municipalities
+  (`data/StationSearch.kt`, rules in DEVELOPMENT.md "Search"). Every typed
+  word must start a word of the target; case/accents/apostrophes ignored;
+  "S." = San/Santo/Santa/Sant' (added on the data side only). Ranking:
+  ≤ 5 municipalities (exact, prefix, words; bigger first), then ≤ 50
+  stations (whole-word matches first, then name/brand prefix, name+brand,
+  anywhere; sellers of the chosen fuel first, then nearest to the map centre).
+  Index: sorted vocabulary + word ids per station, built in the background
+  once per download (~1 s, +5 MB); a keystroke costs 4–10 ms (≤ 70 ms for
+  2 letters). UI: Material 3 `SearchBar` + `ExpandedFullScreenSearchBar`;
+  `ExpandedDockedSearchBar` only when wide and >= 480 dp tall (tablets:
+  the dropdown fitted one result above the keyboard on a landscape phone). Portrait: bar +
+  gear, then date pill (left) + fuel button (right). Wide: one row, bar
+  360 dp aligned with the side panel, which opens under it; gear, pill
+  centred in the rest, fuel button at the right. A municipality result acts
+  like an empty-map tap and frames its stations (`CameraMove.FitPoints`),
+  leaving out misfiled ones (> 5× median distance from the median point and
+  > 10 km; towns with < 3 stations keep all: `Municipality.mainStations`); a
+  station result selects it and shows it (`CameraMove.Show`, after the sheet
+  settles). A selected station without a marker (doesn't sell the chosen
+  fuel) gets a hollow dot inside the ring (own one-point source).
+  Full-screen search: status bar icons follow the app theme.
+  The ~25 stations dropped for misplaced coordinates are not searchable
+  (owner's choice for now; adding them = new optional `unlocated` key, no
+  schema bump, fixture regenerated).
+- Municipality names: shown in Italian title case everywhere
+  (`data/PlaceNames.kt`, "Reggio nell'Emilia"); station names and addresses
+  as MIMIT writes them. 9 names in the data differ from ISTAT's spelling,
+  listed in DEVELOPMENT.md; no hard-coded exceptions.
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
   collapsed = name + main prices, expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
@@ -365,6 +392,9 @@ personal use on the test phone. Done in step 8 so far:
 - 8.4: full-screen map, floating gear, status bar icons + scrim following the
   map, see "Full-screen map" above; checked on the phone (light/dark map,
   portrait/landscape, screenrecords) and the tablet emulator.
+- 8.5: search (stations, municipalities) with a search bar on top of the map,
+  municipality names in title case; see "Search" above; checked on the phone
+  (portrait/landscape, light/dark map, near-me interplay, screenrecord).
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
@@ -386,7 +416,6 @@ Next: the rest of step 8 (see the backlog below).
 
 - **Cold start** takes ~750 ms; measure where it goes (cache parse, ranking,
   GeoJSON, style load) and trim.
-- **Search by name** (station name, brand, municipality).
 - **Favorites** (saved locally, no account).
 - **Publishing prep**:
   - **The name "FuelUp" is taken on the Play Store** (`com.takeapp.fuelup`):

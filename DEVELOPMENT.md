@@ -165,7 +165,10 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
 | `java/…/ui/map/MapScreen.kt` | Full-screen map, station sheet (non-modal) or side panel on wide windows, credits that follow them, status bar icons |
-| `java/…/ui/map/MapTopControls.kt` | Date pill, fuel button and settings button over the top of the map (one row or two) |
+| `java/…/ui/map/MapTopControls.kt` | Search bar, settings button, date pill and fuel button over the top of the map (one row or two) |
+| `java/…/ui/map/MapSearch.kt` | The search bar and its results (full screen, or dropping down on wide windows) |
+| `java/…/data/StationSearch.kt` | Offline search over stations and municipalities: matching and ranking |
+| `java/…/data/PlaceNames.kt` | Municipality names in Italian title case ("Reggio nell'Emilia") |
 | `java/…/ui/map/SidePanel.kt` | The side panel (station details, "near me" list) on wide windows |
 | `java/…/ui/WindowSize.kt` | Wide-window test (Material window size classes) and the 600 dp content width for Settings/About |
 | `java/…/map/MapLibreMap.kt` | MapLibre `MapView` inside Compose (all MapLibre glue) |
@@ -247,6 +250,8 @@ Release builds will be faster.
 | UI frames while the cache is parsed | 1–2% janky, 99th percentile 15–36 ms |
 | Map frames while panning (SurfaceFlinger) | steady 16.7 ms (60 fps), none missed |
 | Cold start | one long frame (~750 ms) from MapLibre start-up, with or without data |
+| Build the search index (background, once per download) | ~1 s, +5 MB Java heap (3 Oct 2026) |
+| Search per keystroke (21.5k stations) | 4–10 ms; up to ~70 ms for a 2-letter query matching thousands (3 Oct 2026) |
 | Back from Settings/About to the map | before: map rebuilt, 1.04–2.16 s (median 1.27 s, 10 runs) until fully drawn; now: no redraw needed, the map is complete in every frame of the ~0.5 s fade (3 Oct 2026) |
 
 To see the timings yourself: `adb logcat -s FuelUpPerf` (debug builds only).
@@ -375,9 +380,9 @@ the station details and the "near me" list move from the bottom sheet to a
 - **Camera:** the near-me circle is framed beside the panel, a station picked
   from the list is centred in the free part of the map, and a station tapped
   where the panel opens is panned just enough to stay visible.
-- **Overlays:** the credits line moves to the right of the open panel and the
-  date pill centres in the free part of the map; the fuel button, the gear and
-  the my-location button stay on the right.
+- **Overlays:** the panel opens under the search bar, which is aligned with it
+  (see *Search*), so the top controls never move; the credits line moves to
+  the right of the open panel; the my-location button stays on the right.
 - **Rotation** keeps the content (station or list, minimised or not) and the
   scroll position. The sheet comes back collapsed or expanded as it was, or
   expanded if the panel was scrolled, so the position stays visible. The
@@ -391,13 +396,13 @@ the station details and the "near me" list move from the bottom sheet to a
 The map screen has no top bar: the map runs edge to edge, under the status
 bar. Settings and About keep their own top bar with Back.
 
-- **Top controls** (`ui/map/MapTopControls.kt`): the date pill, the fuel
-  button and a round settings (gear) button, all 48 dp tall. On one row when
-  they fit beside the side panel's place (landscape phones, tablets), with the
-  pill centred as far as the buttons allow; otherwise (portrait phones) the
-  pill is centred with the gear on its right and the fuel button under the
-  gear. The choice is measured, so longer labels (e.g. "Benzina · Servito")
-  can fall back to two rows; it doesn't change while the panel slides in.
+- **Top controls** (`ui/map/MapTopControls.kt`): the search bar (56 dp) with
+  a round settings (gear) button beside it, the date pill and the fuel button
+  (48 dp). Portrait: bar and gear on the first row, pill (left) and fuel button
+  (right) on the second. Wide windows: one row (bar aligned with the side
+  panel, gear, pill centred in the rest, fuel button at the right end); if the
+  pill and the fuel button don't fit there, they move to a second row on the
+  right. Measured, so longer labels (e.g. "Benzina · Servito") fall back by themselves.
 - **Status bar:** its icons follow the map (dark icons on the light map,
   light on the dark one; the app theme while Settings or About is open), over
   a faint wash of the map's own tone so place names don't mix with the clock.
@@ -428,6 +433,89 @@ for p in gps network fused; do
   adb shell cmd location providers set-test-provider-location $p --location 43.66,10.63 --accuracy 20
 done
 ```
+
+### Search
+
+The search bar at the top of the map finds **stations** (name, brand,
+address, municipality, province) and **municipalities**, offline, in the data
+already on the phone (`data/StationSearch.kt`). No geocoding: an address that
+isn't a station's isn't found.
+
+**Matching.** Texts and queries are cut into words the same way: lowercase,
+accents removed ("forli" = "Forlì"), split at anything that isn't a letter or
+digit, apostrophes included ("sant elpidio" = "Sant'Elpidio"). Dotted
+abbreviations become one word ("S.S." = "ss"). Every word typed must be the
+**start** of a word of the target, in any order ("eni pisa", "piag viale").
+On the data side only, some words are added so the full form also matches:
+a lone "S." also counts as san / santo / santa / sant ("san ilario" finds
+"S.ILARIO"), words joined at an apostrophe ("denza" finds "D'ENZA"), and
+V.LE / C.SO / P.ZA / P.ZZA / F.LLI as viale / corso / piazza / fratelli.
+Municipalities also match written without spaces ("santelpidio", "laquila");
+the province code is a word too ("san giuliano pi"). Fewer than 2 letters: no results.
+
+**Ranking.** Up to 5 municipalities first: exact name, then names starting with
+the text, then all words matching; bigger towns (more stations) first. Then up
+to 50 stations, in tiers: stations matching every word **in full** before
+those matching only the start of a longer word ("roma": stations in Rome
+before "ROMAIRONE"); within that, name or brand starting with the text, then
+all words in name + brand, then all words anywhere. Within a tier: stations
+selling the chosen fuel first, then nearest to the centre of the map.
+
+**Speed.** Each word of the data is stored once in a sorted list, and each
+station keeps its words as numbers; the words starting with what was typed are
+then one range of numbers (two binary searches), so checking a station is a few
+integer comparisons. The index is built in the background after the map data,
+once per download; each keystroke cancels the previous search.
+
+**Results.** A municipality shows its number of stations and the cheapest
+usable price of the chosen fuel (as a cluster's "from" price: no prices to
+verify, no Livigno); tapping it frames its stations. Stations filed under the
+wrong municipality (one "PISA" station is in Capannoli, 26 km away) would zoom
+the map out, so the frame leaves out those more than **5× the median distance**
+from the municipality's median point **and more than 10 km** away
+(`Municipality.mainStations`). Towns with fewer than 3 stations keep all of them
+(no telling which one is wrong). On 2 Oct 2026 data this leaves out 192 stations
+in 148 municipalities, among them misfiled ones 180–560 km away; with a 5 km
+floor, real outlying parts of compact towns were cut too. Pisa: the limit is
+13 km, so Tirrenia (11 km, part of Pisa) stays and Capannoli goes. A station
+shows the chosen fuel's price and class, like the "near me" rows; tapping it
+selects it as a marker tap would. A station that doesn't sell the chosen fuel
+has no marker: it is drawn as a hollow dot inside the selection ring.
+
+**Layout.** Portrait: the search bar across the top with the gear on its
+right; below, the date pill on the left and the fuel button on the right. Open,
+the search covers the screen (Material 3 `ExpandedFullScreenSearchBar`; status
+bar icons follow the app theme). Wide windows: one row; the search bar is as
+wide as the side panel and aligned with it, the panel opens under it, and the
+results drop down under the bar (`ExpandedDockedSearchBar`, at most ⅔ of the
+height) with the map still in view, **only on windows at least 480 dp tall**
+(tablets, `isTallWindow()`). Landscape phones use the full-screen search as in
+portrait: the dropdown fitted one result above the keyboard. Back closes the keyboard, then the search.
+
+### Municipality names
+
+MIMIT writes municipalities in capitals; the app shows them in Italian title
+case (`data/PlaceNames.kt`): every word capitalised, also after a hyphen or an
+apostrophe ("L'Aquila", "Antey-Saint-André"), except linking words (di, del,
+della, nell', sul, in, la, li, …) unless they start the name ("Reggio
+nell'Emilia", "La Spezia"). Station names and addresses stay as MIMIT writes them.
+
+Checked against ISTAT's list of the 7,896 municipalities (3 Oct 2026): 15 differ.
+Among those in the data (9):
+
+| The app shows | Official name |
+|---|---|
+| Boffalora Sopra Ticino, Castelletto Sopra Ticino | … sopra Ticino |
+| Appiano / Caldaro / Salorno / Termeno sulla Strada del Vino | … sulla strada del vino |
+| Trodena nel Parco Naturale | Trodena nel parco naturale |
+| Morra de Sanctis | Morra De Sanctis |
+| San Giorgio la Molara | San Giorgio La Molara |
+
+Not in today's data: Cortaccia, Cortina, Magrè and Montagna sulla strada del
+vino, Sotto il Monte Giovanni XXIII ("Xxiii"), San Vincenzo La Costa. "Sopra"
+is capitalised in 11 official names and lowercase in 2, so the rule keeps it
+capitalised. 39 names in the data are not in today's ISTAT list (merged or
+renamed municipalities, e.g. "CORIGLIANO CALABRO"), so they couldn't be checked.
 
 ### Localization rules
 
