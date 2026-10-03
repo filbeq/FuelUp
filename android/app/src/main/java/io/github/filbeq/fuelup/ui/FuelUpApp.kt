@@ -8,9 +8,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.ui.about.AboutScreen
 import io.github.filbeq.fuelup.ui.map.MapScreen
@@ -52,7 +54,7 @@ fun FuelUpApp(
 
     NavDisplay(
         backStack = backStack,
-        onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+        onBack = { if (backStack.size > 1) popBackStack(backStack) },
         entryProvider = entryProvider {
             entry<MapRoute> {
                 MapScreen(
@@ -87,12 +89,17 @@ fun FuelUpApp(
                     onMapStyleChange = settingsViewModel::setMapStyle,
                     onLanguageChange = settingsViewModel::setLanguage,
                     onOpenAbout = { backStack.add(AboutRoute) },
-                    onBack = { backStack.removeAt(backStack.lastIndex) },
+                    onBack = { popBackStack(backStack) },
                 )
             }
             entry<AboutRoute> {
-                AboutScreen(onBack = { backStack.removeAt(backStack.lastIndex) })
+                AboutScreen(onBack = { popBackStack(backStack) })
             }
         },
     )
+}
+
+private fun popBackStack(backStack: NavBackStack<NavKey>) {
+    backStack.removeAt(backStack.lastIndex)
+    if (backStack.last() == MapRoute) PerfLog.mark("back to map")
 }

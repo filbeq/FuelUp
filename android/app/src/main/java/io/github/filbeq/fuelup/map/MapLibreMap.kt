@@ -17,8 +17,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.data.Geo
 import io.github.filbeq.fuelup.data.UserPosition
+import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -105,6 +107,8 @@ fun MapLibreMap(
     val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
+    // Stations handed to the current style (for the "back to map" timing in debug builds).
+    val stationsShown = remember { AtomicBoolean(false) }
     val mapView = remember {
         val options = MapLibreMapOptions.createFromAttributes(context)
             .camera(
@@ -118,6 +122,11 @@ fun MapLibreMap(
             .logoEnabled(false)
         MapView(context, options).apply {
             onCreate(null)
+            addOnDidFinishRenderingFrameListener(
+                MapView.OnDidFinishRenderingFrameListener { fully, _, _ ->
+                    if (fully && stationsShown.get()) PerfLog.endMark("map drawn")
+                },
+            )
             getMapAsync { map ->
                 map.addOnMapClickListener { latLng ->
                     val style = map.style?.takeIf { it.isFullyLoaded } ?: return@addOnMapClickListener false
@@ -140,6 +149,7 @@ fun MapLibreMap(
     // Changing the app language recreates the screen, so the language is fixed here.
     LaunchedEffect(mapView, styleUrl) {
         loadedStyle = null
+        stationsShown.set(false)
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
                 LabelLanguage.apply(style, labelLanguage)
@@ -154,7 +164,10 @@ fun MapLibreMap(
     }
 
     LaunchedEffect(loadedStyle, stationsGeoJson) {
-        loadedStyle?.let { StationLayers.setData(it, stationsGeoJson) }
+        loadedStyle?.let {
+            StationLayers.setData(it, stationsGeoJson)
+            stationsShown.set(stationsGeoJson != null)
+        }
     }
 
     LaunchedEffect(loadedStyle, selectedStationId) {
