@@ -3,6 +3,7 @@ package io.github.filbeq.fuelup.ui.map
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -38,12 +39,13 @@ fun DataStatusCard(state: MapUiState, onRetry: () -> Unit, modifier: Modifier = 
     val canRetry = snapshot == null && state.status in setOf(DataStatus.Offline, DataStatus.Failed)
 
     Surface(
-        modifier = modifier.padding(8.dp).widthIn(max = 480.dp),
+        // At least as tall as the buttons beside it.
+        modifier = modifier.padding(8.dp).widthIn(max = 480.dp).heightIn(min = 48.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.medium,
         shadowElevation = 2.dp,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.Center) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (snapshot != null) {
                     val locale = LocalConfiguration.current.locales[0]

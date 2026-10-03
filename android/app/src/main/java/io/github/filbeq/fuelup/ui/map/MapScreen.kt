@@ -7,20 +7,23 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.BottomSheetDefaults
@@ -28,14 +31,11 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +53,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -62,6 +64,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -69,6 +72,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
@@ -321,15 +325,29 @@ fun MapScreen(
     var mapLeftPx by remember { mutableFloatStateOf(0f) }
     // Height of the controls over the top of the map (fuel chips, status card).
     var topControlsPx by remember { mutableIntStateOf(0) }
-    // Side panel: the system bars and camera cutout beside the map (landscape).
+    var mapWidthPx by remember { mutableIntStateOf(0) }
+    // The system bars and camera cutout beside the map (landscape).
     val layoutDirection = LocalLayoutDirection.current
-    val safeLeftPx = if (wide) WindowInsets.safeDrawing.getLeft(density, layoutDirection) else 0
-    val safeRightPx = if (wide) WindowInsets.safeDrawing.getRight(density, layoutDirection) else 0
+    val safeLeftPx = WindowInsets.safeDrawing.getLeft(density, layoutDirection)
+    val safeRightPx = WindowInsets.safeDrawing.getRight(density, layoutDirection)
     // The part of the map the open side panel covers, from its left edge: fixed,
     // for camera moves (the measured edge moves while the panel slides in).
     val panelCoverPx = if (wide) safeLeftPx + with(density) { (SIDE_PANEL_WIDTH + SIDE_PANEL_MARGIN * 2).roundToPx() } else 0
     // The same, as drawn right now, for the controls over the map.
     val panelShownPx = (panelRightPx - mapLeftPx).coerceAtLeast(0f).roundToInt()
+    // The top controls' width beside the panel's place, open or not: opening
+    // it doesn't rearrange them halfway through its slide.
+    val topControlsRowWidth = if (wide) with(density) { (mapWidthPx - panelCoverPx - safeRightPx).toDp() } else null
+
+    // The map runs under the status bar: its icons follow the map's darkness
+    // (dark icons on the light map), and the app theme while another screen is on top.
+    val appDark = isSystemInDarkTheme()
+    val mapIsDark = mapStyle.isDark(darkTheme = appDark)
+    val view = LocalView.current
+    LaunchedEffect(activity, covered, mapIsDark, appDark) {
+        val window = activity?.window ?: return@LaunchedEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !(if (covered) appDark else mapIsDark)
+    }
 
     // The "near me" list: recomputed when the position, radius, order, fuel or data change (~ms).
     val nearby = remember(nearMe.position, nearMe.settings, state.ranking, state.snapshot) {
@@ -447,37 +465,22 @@ fun MapScreen(
         }
     }
 
-    val topBar: @Composable () -> Unit = {
-        TopAppBar(
-            title = { Text(stringResource(R.string.app_name)) },
-            actions = {
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_settings),
-                        contentDescription = stringResource(R.string.settings_title),
-                    )
-                }
-            },
-        )
-    }
-
     // The map and the controls over it; on wide windows the side panel too.
-    val mapArea: @Composable (PaddingValues) -> Unit = { padding ->
+    // Full screen, edge to edge: the sheet floats over the map, which stays full height.
+    val mapArea: @Composable () -> Unit = {
         Box(
             Modifier
                 .fillMaxSize()
-                // Top bar only: the sheet floats over the map, which stays full height.
-                .padding(top = padding.calculateTopPadding())
                 .onGloballyPositioned {
                     val bounds = it.boundsInWindow()
                     mapBottomPx = bounds.bottom
                     mapLeftPx = bounds.left
                     mapHeightPx = it.size.height
+                    mapWidthPx = it.size.width
                 },
         ) {
-            val mapIsDark = mapStyle.isDark(darkTheme = isSystemInDarkTheme())
             MapLibreMap(
-                styleUrl = provider.styleUrl(mapStyle, darkTheme = isSystemInDarkTheme()),
+                styleUrl = provider.styleUrl(mapStyle, darkTheme = appDark),
                 camera = camera,
                 onCameraIdle = onCameraChange,
                 stationsGeoJson = state.stationsGeoJson,
@@ -513,29 +516,40 @@ fun MapScreen(
                 cameraCommand = cameraCommand,
                 modifier = Modifier.fillMaxSize(),
             )
-            Column(
+            // A faint wash of the map's own tone under the status bar, so place
+            // names don't mix with the clock and icons.
+            val scrim = if (mapIsDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.7f)
+            Box(
                 Modifier
                     .fillMaxWidth()
+                    .height(with(density) { (WindowInsets.statusBars.getTop(density) * 1.5f).toDp() })
+                    .background(Brush.verticalGradient(0f to scrim, 0.6f to scrim, 1f to Color.Transparent)),
+            )
+            MapTopControls(
+                state = state,
+                onRetry = onRetry,
+                onOpenFuel = { fuelPanelOpen = true },
+                onOpenSettings = onOpenSettings,
+                rowWidth = topControlsRowWidth,
+                modifier = Modifier
                     .align(Alignment.TopCenter)
-                    // Side panel open: the pill centres in the free part of the map.
+                    // Measured with the insets, from the top of the map: includes the status bar.
+                    .onSizeChanged { topControlsPx = it.height }
+                    // Below the status bar, clear of the cutout and a side navigation bar;
+                    // side panel open: beside it (the pill centres in the free part of the map).
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                     .padding(
                         start = with(density) { maxOf(panelShownPx, safeLeftPx).toDp() },
                         end = with(density) { safeRightPx.toDp() },
-                    )
-                    .onSizeChanged { topControlsPx = it.height },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                DataStatusCard(state = state, onRetry = onRetry)
-                // On the right, like Google Maps' map-type button; always shows the current choice.
-                FuelChoiceButton(
-                    choice = state.choice,
-                    onClick = { fuelPanelOpen = true },
-                    modifier = Modifier.align(Alignment.End),
-                )
-            }
+                    ),
+            )
             // Lift the credits and the button above the sheet so they're never covered;
             // move the credits beside the side panel.
-            val aboveSheet = Modifier.offset { IntOffset(0, -(mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt()) }
+            // A tall sheet covers them instead of pushing them up into the top controls and status bar.
+            val maxLiftPx = (mapHeightPx - topControlsPx - with(density) { LIFT_CLEARANCE.toPx() }).coerceAtLeast(0f)
+            val aboveSheet = Modifier.offset {
+                IntOffset(0, -(mapBottomPx - sheetTopPx).coerceIn(0f, maxLiftPx).roundToInt())
+            }
             val besidePanel = Modifier.offset { IntOffset(maxOf(panelShownPx, safeLeftPx), 0) }
             MapAttributionBar(
                 onClick = onOpenAbout,
@@ -562,7 +576,7 @@ fun MapScreen(
                     onRightEdge = { panelRightPx = it },
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Bottom))
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom))
                         .padding(SIDE_PANEL_MARGIN),
                 ) { closeButton ->
                     panelContent(closeButton)
@@ -574,8 +588,9 @@ fun MapScreen(
     // Behind another screen: hidden from TalkBack, which would otherwise read the map too.
     val screenModifier = if (covered) Modifier.clearAndSetSemantics { } else Modifier
     if (sheetState == null) {
-        Scaffold(modifier = screenModifier, topBar = topBar, contentWindowInsets = WindowInsets(0)) { padding ->
-            mapArea(padding)
+        // Side panel layout: nothing but the map and what floats over it.
+        Box(screenModifier) {
+            mapArea()
         }
     } else {
         BottomSheetScaffold(
@@ -586,13 +601,19 @@ fun MapScreen(
                 Box(Modifier.onSizeChanged { handleHeightPx = it.height }) { BottomSheetDefaults.DragHandle() }
             },
             sheetContent = {
-                Column(Modifier.fillMaxWidth().onGloballyPositioned { sheetTopPx = it.positionInWindow().y - handleHeightPx }) {
+                // Fully expanded, the sheet stops just below the status bar (the map runs under it).
+                val sheetMaxPx = mapHeightPx - WindowInsets.statusBars.getTop(density) - handleHeightPx - with(density) { 8.dp.roundToPx() }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(if (sheetMaxPx > 0) Modifier.heightIn(max = with(density) { sheetMaxPx.toDp() }) else Modifier)
+                        .onGloballyPositioned { sheetTopPx = it.positionInWindow().y - handleHeightPx },
+                ) {
                     panelContent(null)
                 }
             },
-            topBar = topBar,
-        ) { padding ->
-            mapArea(padding)
+        ) {
+            mapArea()
         }
     }
 }
@@ -607,6 +628,8 @@ private fun MapAttributionBar(onClick: () -> Unit, modifier: Modifier = Modifier
     Surface(
         modifier = modifier.padding(4.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+        // Explicit: a translucent surface isn't a theme colour, so Surface can't pick the text colour.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.extraSmall,
     ) {
         Text(
@@ -626,6 +649,9 @@ private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_COARSE_LOC
 
 /** Zoom at which stations show one by one (clusters end at 13). */
 private const val STATION_ZOOM = 14.0
+
+/** Room the credits and the my-location button (and its margin) need below the top controls. */
+private val LIFT_CLEARANCE = 150.dp
 
 /** Share of the map's height the sheet is assumed to cover before the list is measured. */
 private const val SHEET_SHARE = 0.4f
