@@ -259,7 +259,10 @@ small enough to be tested on a real phone before moving on.
     circle (solid line on a soft halo); the camera fits it between the top
     controls and the sheet.
     Colours follow the map's darkness (`LocationColor*`, like the clusters),
-    every line has a halo in the opposite tone. Disc and circle lie under the
+    every line has a halo in the opposite tone.
+    The camera fits the circle only for a new fix or radius while "near me" is
+    open (last fit saved across rotation); the saved camera is the view's
+    centre, since after a fit MapLibre keeps the padding in the camera target. Disc and circle lie under the
     stations; the centre mark is a symbol above them, so colliding price
     labels/pills are left out rather than half-covered. Shown only while
     "near me" is open.
@@ -302,10 +305,6 @@ done. Next: the rest of step 8 (see the backlog below).
 - The user's centre mark can hide a nearby cluster's "from" pill (by design:
   colliding labels are left out rather than half-covered).
 - Lint's only warning is `OldTargetApi` (targetSdk 36): accepted for now.
-- After a rotation (or any recreation) the camera re-fits the last "near me"
-  circle even when "near me" is closed (`MapScreen`'s fit effect only checks
-  `nearMe.position`); in landscape the fit logs a harmless MapLibre "padding
-  greater than map's height" error.
 
 ### Backlog for step 8 (in no particular order)
 
