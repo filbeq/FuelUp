@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -31,6 +33,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -40,14 +44,22 @@ import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.AppSettings
 import io.github.filbeq.fuelup.data.MapStyleMode
+import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.ThemeMode
 import io.github.filbeq.fuelup.data.isDark
 import io.github.filbeq.fuelup.data.mapStyleForAutomatic
 import io.github.filbeq.fuelup.data.mapStyleForDark
 import io.github.filbeq.fuelup.data.themeForDark
 import io.github.filbeq.fuelup.data.themeForFollowSystem
+import io.github.filbeq.fuelup.ui.map.ManualUpdate
+import io.github.filbeq.fuelup.ui.map.formatPricesAt
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
-/** Theme, map style and language, plus the way to About. */
+/** Theme, map style, language and "Update data now", plus the way to About. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -56,6 +68,11 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onMapStyleChange: (MapStyleMode) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
+    /** "Update data now": its state, when the server was last checked, the prices shown now. */
+    dataUpdate: ManualUpdate,
+    lastChecked: Instant?,
+    currentPricesAt: String?,
+    onUpdateNow: () -> Unit,
     onOpenAbout: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -106,6 +123,9 @@ fun SettingsScreen(
             SectionTitle(R.string.settings_language)
             LanguageMenu(language, onLanguageChange, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
+            SectionTitle(R.string.settings_data)
+            UpdateNowRow(dataUpdate, lastChecked, currentPricesAt, onUpdateNow)
+
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             ListItem(
                 headlineContent = { Text(stringResource(R.string.about_title)) },
@@ -124,6 +144,63 @@ private fun SectionTitle(@StringRes title: Int) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp).semantics { heading() },
     )
+}
+
+/**
+ * "Update data now": asks the server even if today's data is already here, then
+ * says what happened. Under it, when the server was last checked.
+ */
+@Composable
+private fun UpdateNowRow(update: ManualUpdate, lastChecked: Instant?, currentPricesAt: String?, onUpdateNow: () -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
+    val running = update == ManualUpdate.Running
+    val checkedText = lastChecked?.let {
+        val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(locale)
+        stringResource(R.string.settings_last_checked, formatter.format(it.atZone(ZoneId.systemDefault())))
+    } ?: stringResource(R.string.settings_never_checked)
+    val outcome: Pair<String, Boolean>? = when (update) {
+        ManualUpdate.Idle -> null
+        ManualUpdate.Running -> stringResource(R.string.settings_updating) to false
+        is ManualUpdate.Done -> when (val result = update.result) {
+            is RefreshResult.Updated -> pricesAtText(R.string.update_result_updated, result.snapshot.meta.pricesAt, locale) to false
+            RefreshResult.UpToDate -> currentPricesAt?.let {
+                pricesAtText(R.string.update_result_up_to_date, it, locale) to false
+            }
+            RefreshResult.Offline -> stringResource(R.string.update_result_offline) to true
+            RefreshResult.Failed -> stringResource(R.string.update_result_failed) to true
+            RefreshResult.UpdateRequired -> stringResource(R.string.error_update_required) to true
+        }
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_update_now)) },
+        supportingContent = {
+            Column {
+                outcome?.let { (text, isError) ->
+                    Text(text, color = if (isError) MaterialTheme.colorScheme.error else Color.Unspecified)
+                }
+                Text(checkedText)
+            }
+        },
+        leadingContent = { Icon(painterResource(R.drawable.ic_refresh), contentDescription = null) },
+        trailingContent = if (running) {
+            { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+        } else {
+            null
+        },
+        modifier = Modifier.clickable(enabled = !running, role = Role.Button, onClick = onUpdateNow),
+    )
+}
+
+/** "… prices of 02/10, 8:00" in the app language. */
+@Composable
+private fun pricesAtText(@StringRes text: Int, pricesAt: String, locale: Locale): String {
+    val (date, time) = formatPricesAt(
+        pricesAt,
+        stringResource(R.string.prices_date_pattern),
+        stringResource(R.string.prices_time_pattern),
+        locale,
+    )
+    return stringResource(text, date, time)
 }
 
 /** A whole-row switch; disabled rows are greyed and announced as disabled. */

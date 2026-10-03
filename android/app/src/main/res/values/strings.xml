@@ -104,6 +104,15 @@
     <string name="settings_dark_map">Dark map</string>
     <string name="settings_map_style">Map style</string>
     <string name="settings_language">Language</string>
+    <string name="settings_data">Data</string>
+    <string name="settings_update_now">Update data now</string>
+    <string name="settings_last_checked">Last checked: %1$s</string>
+    <string name="settings_never_checked">Not checked yet</string>
+    <string name="settings_updating">Checking for new prices…</string>
+    <string name="update_result_updated">Updated to prices of %1$s, %2$s</string>
+    <string name="update_result_up_to_date">Already up to date (prices of %1$s, %2$s)</string>
+    <string name="update_result_offline">No connection: try again when you\'re online</string>
+    <string name="update_result_failed">Update failed: try again later</string>
     <string name="language_system">System default</string>
     <!-- Each language name is written in its own language. -->
     <string name="language_italian" translatable="false">Italiano</string>

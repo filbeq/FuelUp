@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.Instant
 
 /** What the data part of the map screen shows. */
 data class MapUiState(
@@ -37,7 +38,19 @@ data class MapUiState(
     val choice: FuelChoice = FuelChoice.Default,
     /** Price and comparison for [choice], by station id (stations not selling it are absent). */
     val ranking: Map<Int, RankedPrice> = emptyMap(),
+    /** When the server was last asked for new data (null = never). */
+    val lastChecked: Instant? = null,
+    /** "Update data now" in Settings. */
+    val manualUpdate: ManualUpdate = ManualUpdate.Idle,
 )
+
+/** State of the "Update data now" button in Settings. */
+sealed interface ManualUpdate {
+    data object Idle : ManualUpdate
+    data object Running : ManualUpdate
+    /** Finished; shown in Settings until the next run. */
+    data class Done(val result: RefreshResult) : ManualUpdate
+}
 
 enum class DataStatus {
     /** Reading the cache or talking to the server. */
@@ -82,7 +95,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             val choice = withContext(Dispatchers.IO) { choiceStore.load() }
             val cached = withContext(Dispatchers.IO) { PerfLog.timeWithHeap("cache") { repository.loadCached() } }
             val prepared = cached?.let { prepare(it, choice) }
-            _state.value = MapUiState(cached, prepared?.geoJson, DataStatus.Loading, choice, prepared?.ranking.orEmpty())
+            val lastChecked = withContext(Dispatchers.IO) { repository.lastMetaCheck() }
+            _state.value = MapUiState(
+                cached, prepared?.geoJson, DataStatus.Loading, choice, prepared?.ranking.orEmpty(), lastChecked,
+            )
             refresh(force = false)
         }
     }
@@ -112,11 +128,27 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         refreshJob = viewModelScope.launch { refresh(force = true) }
     }
 
-    private suspend fun refresh(force: Boolean) {
+    /**
+     * "Update data now": asks the server even if the cache is already current
+     * (see [StationRepository.refresh]), after any refresh already running.
+     */
+    fun updateNow() {
+        if (_state.value.manualUpdate == ManualUpdate.Running) return
+        _state.update { it.copy(manualUpdate = ManualUpdate.Running) }
+        val running = refreshJob
+        refreshJob = viewModelScope.launch {
+            running?.join()
+            val result = refresh(force = true, manual = true)
+            _state.update { it.copy(manualUpdate = ManualUpdate.Done(result)) }
+        }
+    }
+
+    private suspend fun refresh(force: Boolean, manual: Boolean = false): RefreshResult {
         _state.update { it.copy(status = DataStatus.Loading) }
         val current = _state.value.snapshot
-        val result = withContext(Dispatchers.IO) {
-            PerfLog.timeWithHeap("refresh") { repository.refresh(current, force) }
+        val (result, lastChecked) = withContext(Dispatchers.IO) {
+            val result = PerfLog.timeWithHeap("refresh") { repository.refresh(current, force, manual) }
+            result to repository.lastMetaCheck()
         }
         val choice = _state.value.choice
         val prepared = (result as? RefreshResult.Updated)?.let { prepare(it.snapshot, choice) }
@@ -132,8 +164,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
                 RefreshResult.Failed -> it.copy(status = DataStatus.Failed)
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
-            }
+            }.copy(lastChecked = lastChecked)
         }
+        return result
     }
 
     private class Prepared(val ranking: Map<Int, RankedPrice>, val geoJson: String)

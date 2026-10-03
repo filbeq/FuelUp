@@ -86,6 +86,59 @@ class StationRepositoryTest {
     }
 
     @Test
+    fun manualCheckIgnoresSameDateRuleAndHourlyLimit() {
+        val repo = repository()
+        repo.refresh(null)
+        server.requests.clear()
+
+        // The cache already holds the newest date and was checked just now,
+        // yet "Update data now" still asks the server; same file: nothing downloaded.
+        assertEquals(RefreshResult.UpToDate, repo.refresh(repo.loadCached(), manual = true))
+        assertEquals(listOf("meta.json"), server.requests)
+    }
+
+    @Test
+    fun manualCheckDownloadsFileRepublishedForSameDate() {
+        val repo = repository()
+        repo.refresh(null)
+        server.publish(republished(dataset("2026-09-30")))
+        server.requests.clear()
+
+        // The automatic check never sees it (same date)...
+        assertEquals(RefreshResult.UpToDate, repo.refresh(repo.loadCached()))
+        assertEquals(emptyList<String>(), server.requests)
+        // ...the manual one does, and replaces the cache.
+        val result = repo.refresh(repo.loadCached(), manual = true)
+        assertTrue(result is RefreshResult.Updated)
+        assertEquals(listOf("meta.json", "stations.json"), server.requests)
+        assertEquals(server.sha256("stations.json"), repo.loadCached()!!.meta.sha256)
+    }
+
+    @Test
+    fun manualCheckOfflineKeepsCacheAndCheckTime() {
+        val repo = repository()
+        repo.refresh(null)
+        val checked = repo.lastMetaCheck()
+        now = now.plusSeconds(600)
+        server.failure = IOException("no route to host")
+
+        assertEquals(RefreshResult.Offline, repo.refresh(repo.loadCached(), manual = true))
+        assertEquals("2026-09-30", repo.loadCached()!!.meta.dataDate)
+        assertEquals(checked, repo.lastMetaCheck()) // a failed check doesn't count as checked
+    }
+
+    @Test
+    fun lastMetaCheckRecordsEachServerCheck() {
+        val repo = repository()
+        assertNull(repo.lastMetaCheck())
+        repo.refresh(null)
+        assertEquals(now.toEpochMilli(), repo.lastMetaCheck()!!.toEpochMilli())
+        now = now.plusSeconds(600)
+        repo.refresh(repo.loadCached(), manual = true)
+        assertEquals(now.toEpochMilli(), repo.lastMetaCheck()!!.toEpochMilli())
+    }
+
+    @Test
     fun offlineWithoutCache() {
         server.failure = IOException("no route to host")
         val repo = repository()
@@ -169,6 +222,18 @@ class StationRepositoryTest {
         return Dataset(meta.toByteArray(), stations)
     }
 
+    /** The same data published again with a different file (e.g. after a pipeline fix). */
+    private fun republished(dataset: Dataset): Dataset {
+        val stations = dataset.stations + "\n".toByteArray()
+        val meta = String(dataset.meta)
+            .replace(Regex("\"bytes\":\\d+"), "\"bytes\":${stations.size}")
+            .replace(Regex("\"sha256\":\"[0-9a-f]+\""), "\"sha256\":\"${sha256(stations)}\"")
+        return Dataset(meta.toByteArray(), stations)
+    }
+
+    private fun sha256(bytes: ByteArray) =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
     private class FakeServer : Fetcher {
         val requests = mutableListOf<String>()
         var failure: IOException? = null
@@ -177,6 +242,9 @@ class StationRepositoryTest {
         fun publish(dataset: Dataset) {
             files = mapOf("meta.json" to dataset.meta, "stations.json" to dataset.stations)
         }
+
+        fun sha256(name: String) =
+            MessageDigest.getInstance("SHA-256").digest(files.getValue(name)).joinToString("") { "%02x".format(it) }
 
         override fun open(url: String): InputStream {
             val name = url.removePrefix(BASE)

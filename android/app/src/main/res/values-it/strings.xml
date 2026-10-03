@@ -95,6 +95,15 @@
     <string name="settings_dark_map">Mappa scura</string>
     <string name="settings_map_style">Stile della mappa</string>
     <string name="settings_language">Lingua</string>
+    <string name="settings_data">Dati</string>
+    <string name="settings_update_now">Aggiorna i dati ora</string>
+    <string name="settings_last_checked">Ultimo controllo: %1$s</string>
+    <string name="settings_never_checked">Non ancora controllati</string>
+    <string name="settings_updating">Controllo dei nuovi prezzi…</string>
+    <string name="update_result_updated">Aggiornato ai prezzi del %1$s, ore %2$s</string>
+    <string name="update_result_up_to_date">Già aggiornato (prezzi del %1$s, ore %2$s)</string>
+    <string name="update_result_offline">Nessuna connessione: riprova quando sei online</string>
+    <string name="update_result_failed">Aggiornamento non riuscito: riprova più tardi</string>
     <string name="language_system">Predefinita di sistema</string>
     <string name="action_my_location">La mia posizione</string>
     <string name="action_open_app_settings">Apri impostazioni</string>

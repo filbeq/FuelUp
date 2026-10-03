@@ -70,10 +70,15 @@ class StationRepository(
         }
     }
 
-    /** Brings the cache up to date if needed. [current] is what is cached/shown now. */
-    fun refresh(current: Snapshot?, force: Boolean = false): RefreshResult {
+    /**
+     * Brings the cache up to date if needed. [current] is what is cached/shown now.
+     * [force] ignores the hourly limit (Retry); [manual] ("Update data now")
+     * always checks the server, even when the cache already holds the newest
+     * date, so a file republished for the same date is picked up too.
+     */
+    fun refresh(current: Snapshot?, force: Boolean = false, manual: Boolean = false): RefreshResult {
         val now = clock()
-        if (!RefreshPolicy.shouldCheckMeta(current?.dataDate, lastMetaCheck(), now, force)) {
+        if (!manual && !RefreshPolicy.shouldCheckMeta(current?.dataDate, lastMetaCheck(), now, force)) {
             return RefreshResult.UpToDate
         }
         dir.mkdirs()
@@ -146,7 +151,8 @@ class StationRepository(
         Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 
-    private fun lastMetaCheck(): Instant? = try {
+    /** When meta.json was last fetched from the server, or null if never. */
+    fun lastMetaCheck(): Instant? = try {
         Instant.ofEpochMilli(lastCheckFile.readText().trim().toLong())
     } catch (e: IOException) {
         null
