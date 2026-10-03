@@ -49,12 +49,15 @@ import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
+import io.github.filbeq.fuelup.data.Geo
 import io.github.filbeq.fuelup.data.Nearby
 import io.github.filbeq.fuelup.data.NearbySort
 import io.github.filbeq.fuelup.data.NearbyStation
+import io.github.filbeq.fuelup.data.PlaceNames
 import io.github.filbeq.fuelup.data.PriceClass
 import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.Station
+import io.github.filbeq.fuelup.data.UserPosition
 import io.github.filbeq.fuelup.map.StationIcons
 import io.github.filbeq.fuelup.ui.station.PriceInfo
 import io.github.filbeq.fuelup.ui.station.choiceLabel
@@ -316,8 +319,26 @@ fun formatDistance(km: Double, approximate: Boolean, locale: Locale): String = w
     }.format(km) + " km"
 }
 
+/**
+ * "Pisa (PI)", plus " · 2,4 km" when the user's [position] is known. Places in
+ * search and favourites can be far away: whole km from 10 km ("250 km").
+ */
+@Composable
+internal fun placeAndDistance(municipality: String, province: String, lat: Double, lon: Double, position: UserPosition?): String {
+    val place = stringResource(R.string.place_with_province, PlaceNames.municipality(municipality), province)
+    if (position == null) return place
+    val km = Geo.distanceKm(position.lat, position.lon, lat, lon)
+    val locale = LocalConfiguration.current.locales[0]
+    val distance = if (km >= 10) {
+        NumberFormat.getIntegerInstance(locale).format(km.roundToInt()) + " km"
+    } else {
+        formatDistance(km, position.accuracyMeters > PRECISE_METERS, locale)
+    }
+    return "$place · $distance"
+}
+
 /** Above this reported accuracy, distances are shown as approximate. */
-internal const val PRECISE_METERS = 500f
+private const val PRECISE_METERS = 500f
 
 @Composable
 private fun classText(priceClass: PriceClass): String = stringResource(

@@ -348,14 +348,16 @@ fun MapScreen(
     // Latest results, with the text they are for. Recomputed off the main thread on
     // every keystroke (the previous search is dropped), and when the fuel or data change.
     var searchResults by remember { mutableStateOf<Pair<String, SearchResults>?>(null) }
+    // Nearest first: from the user when the position is known, else from the map centre.
     val currentCamera by rememberUpdatedState(camera)
-    LaunchedEffect(state.search, state.ranking) {
+    LaunchedEffect(state.search, state.ranking, nearMe.position) {
         val search = state.search ?: return@LaunchedEffect
+        val position = nearMe.position
         snapshotFlow { searchText.text.toString() }.collectLatest { query ->
+            val refLat = position?.lat ?: currentCamera.latitude
+            val refLon = position?.lon ?: currentCamera.longitude
             val results = withContext(Dispatchers.Default) {
-                PerfLog.time("search '$query'") {
-                    search.search(query, state.ranking, currentCamera.latitude, currentCamera.longitude)
-                }
+                PerfLog.time("search '$query'") { search.search(query, state.ranking, refLat, refLon) }
             }
             searchResults = query to results
         }
@@ -517,7 +519,6 @@ fun MapScreen(
             favorites = FavoritesInSearch(
                 list = state.favorites,
                 file = state.snapshot?.stations,
-                position = nearMe.position,
                 onShowSpot = { favorite ->
                     scope.launch { searchBarState.animateToCollapsed() }
                     showSpot(favorite.lat, favorite.lon)
@@ -525,6 +526,7 @@ fun MapScreen(
                 onRemove = onRemoveFavorite,
                 onReplace = { favorite, station -> onReplaceFavorite(favorite, station.id) },
             ),
+            position = nearMe.position,
             onMunicipalityClick = { municipality ->
                 scope.launch { searchBarState.animateToCollapsed() }
                 openMunicipality(municipality)

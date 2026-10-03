@@ -48,6 +48,7 @@ import io.github.filbeq.fuelup.data.SearchResults
 import io.github.filbeq.fuelup.data.SearchText
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationSearch
+import io.github.filbeq.fuelup.data.UserPosition
 import io.github.filbeq.fuelup.map.StationLayers
 import io.github.filbeq.fuelup.ui.station.PriceInfo
 import io.github.filbeq.fuelup.ui.station.formatPrice
@@ -92,13 +93,15 @@ fun MapSearchExpanded(
     ranking: Map<Int, RankedPrice>,
     brands: List<String>,
     favorites: FavoritesInSearch,
+    /** The user's position, if known: distances in the rows. */
+    position: UserPosition?,
     onMunicipalityClick: (Municipality) -> Unit,
     onStationClick: (Station) -> Unit,
 ) {
     val inputField = @Composable { SearchInput(searchBarState, textFieldState) }
     val colors = SearchBarDefaults.colors(containerColor = floatingSurfaceColor())
     val content = @Composable {
-        SearchResultsList(ready, query, results, choice, ranking, brands, favorites, onMunicipalityClick, onStationClick)
+        SearchResultsList(ready, query, results, choice, ranking, brands, favorites, position, onMunicipalityClick, onStationClick)
     }
     if (docked) {
         ExpandedDockedSearchBar(state = searchBarState, inputField = inputField, colors = colors) { content() }
@@ -155,6 +158,7 @@ private fun SearchResultsList(
     ranking: Map<Int, RankedPrice>,
     brands: List<String>,
     favorites: FavoritesInSearch,
+    position: UserPosition?,
     onMunicipalityClick: (Municipality) -> Unit,
     onStationClick: (Station) -> Unit,
 ) {
@@ -181,27 +185,32 @@ private fun SearchResultsList(
     val showFavorites = typed == 0 && favorites.file != null
     val favoriteRows = rememberFavoriteRows(favorites)
     LazyColumn(Modifier.fillMaxWidth().imePadding(), state = listState) {
-        if (showFavorites) favoritesSection(favoriteRows, favorites, choice, ranking, onStationClick)
+        if (showFavorites) favoritesSection(favoriteRows, favorites, choice, ranking, position, onStationClick)
         if (message != null) {
             item { SearchMessage(message) }
             return@LazyColumn
         }
         if (results == null) return@LazyColumn
-        items(results.municipalities, key = { "m:${it.name}:${it.province}" }) { municipality ->
-            MunicipalityRow(municipality, choice, ranking, onClick = { onMunicipalityClick(municipality) })
+        // Towns first only for a place; for a brand ("eni") the nearest stations come first.
+        val placeRows = {
+            items(results.municipalities, key = { "m:${it.name}:${it.province}" }) { municipality ->
+                MunicipalityRow(municipality, choice, ranking, onClick = { onMunicipalityClick(municipality) })
+            }
         }
+        if (results.placesFirst) placeRows()
         items(results.stations, key = { "s:${it.id}" }) { station ->
             StationRow(
                 station = station,
                 brand = brands.getOrElse(station.brand) { "" },
                 price = ranking[station.id],
                 choice = choice,
-                where = stringResource(R.string.place_with_province, PlaceNames.municipality(station.municipality), station.province),
+                where = placeAndDistance(station.municipality, station.province, station.lat, station.lon, position),
                 now = now,
                 onClick = { onStationClick(station) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
+        if (!results.placesFirst) placeRows()
         if (more != null) item { SearchMessage(more) }
     }
 }

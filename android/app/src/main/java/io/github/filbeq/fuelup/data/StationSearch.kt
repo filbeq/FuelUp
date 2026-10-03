@@ -39,12 +39,14 @@ class Municipality(val name: String, val province: String, val stations: List<St
     }
 }
 
-/** What a search finds: municipalities first, then stations (both already ranked). */
+/** What a search finds, both lists already ranked. */
 class SearchResults(
     val municipalities: List<Municipality>,
     val stations: List<Station>,
     /** All matching stations, of which [stations] are the best [StationSearch.MAX_STATIONS]. */
     val stationMatches: Int,
+    /** The query is a place rather than a brand: show [municipalities] before [stations]. */
+    val placesFirst: Boolean = true,
 ) {
     val isEmpty: Boolean get() = municipalities.isEmpty() && stations.isEmpty()
 
@@ -61,12 +63,16 @@ class SearchResults(
  * must be the start of a word in the target, in any order ("eni pisa",
  * "s giuliano"), and "S." / "San" / "Sant'" match each other.
  *
- * Ranking: municipalities first (exact name, then name starting with the text,
- * then all words matching; bigger towns first), then stations: those matching
- * every word in full before those matching only the start of a word ("roma":
- * stations in Rome before "ROMAIRONE"), then name or brand starting with the
- * text, then all words in name + brand, then all words anywhere; within each:
- * selling the chosen fuel, then nearest to the map centre.
+ * Ranking: municipalities by exact name, then name starting with the text,
+ * then all words matching; bigger towns first. Stations: those matching every
+ * word in full before those matching only the start of a word ("roma":
+ * stations in Rome before "ROMAIRONE"); within each, selling the chosen fuel,
+ * then nearest to the reference point (the user, else the map centre).
+ *
+ * Municipalities come first only when the query is a place rather than a
+ * brand ([SearchResults.placesFirst]): it is a municipality's exact name, or
+ * more stations lie in the matching municipalities than carry a brand matching
+ * it ("san": hundreds of towns; "eni", "api", "ip": brands).
  *
  * Speed: every word is stored once in a sorted vocabulary and each target
  * keeps its words as ids, so the words starting with a typed word are one
@@ -76,12 +82,12 @@ class SearchResults(
 class StationSearch private constructor(
     private val vocabulary: Array<String>,
     private val stations: List<Station>,
-    /** Per station: words of its name and brand. */
-    private val nameWords: Array<IntArray>,
     /** Per station: all its words (name, brand, address, municipality, province). */
     private val allWords: Array<IntArray>,
-    /** Per station: name and brand as normalised text, for "starts with the query". */
-    private val nameTexts: Array<Array<String>>,
+    /** Per brand: its words. */
+    private val brandWords: Array<IntArray>,
+    /** Per brand: how many stations carry it. */
+    private val brandCounts: IntArray,
     private val municipalities: List<Municipality>,
     private val municipalityWords: Array<IntArray>,
     /** Per municipality: its name without spaces ("santelpidioamare"). */
@@ -89,9 +95,10 @@ class StationSearch private constructor(
 ) {
     /**
      * Finds what matches [query]. [ranking] tells which stations sell the chosen
-     * fuel (they come first); ties are broken by distance from the map centre.
+     * fuel (they come first); then nearest to [refLat], [refLon] (the user's
+     * position when known, else the map centre).
      */
-    fun search(query: String, ranking: Map<Int, RankedPrice>, centreLat: Double, centreLon: Double): SearchResults {
+    fun search(query: String, ranking: Map<Int, RankedPrice>, refLat: Double, refLon: Double): SearchResults {
         val words = SearchText.queryWords(query)
         val compact = words.joinToString("")
         if (compact.length < MIN_QUERY_LENGTH) return SearchResults.None
@@ -119,22 +126,23 @@ class StationSearch private constructor(
                 .thenBy { it.second.name },
         )
 
-        // Stations: 0 = name or brand starts with the text, 1 = all words in name + brand, 2 = all words anywhere;
-        // +3 when some word only matches the start of a longer word.
-        val spaced = words.joinToString(" ")
-        val cosLat = cos(centreLat * PI / 180)
+        // A place or a brand? An exact name is a place; otherwise whichever more stations answer to.
+        val placesFirst = places.firstOrNull()?.first == 0 || run {
+            val inPlaces = places.sumOf { it.second.stations.size }
+            val byBrand = if (allFound) brandWords.indices.sumOf { if (matchesAll(brandWords[it], ranges)) brandCounts[it] else 0 } else 0
+            inPlaces >= byBrand
+        }
+
+        // Stations: 0 = every word matches a whole word, 1 = some word only the start of a longer one.
+        val cosLat = cos(refLat * PI / 180)
         val hits = ArrayList<StationHit>()
         if (allFound) {
             for (i in stations.indices) {
                 if (!matchesAll(allWords[i], ranges)) continue
-                val tier = when {
-                    nameTexts[i].any { it.startsWith(spaced) } -> 0
-                    matchesAll(nameWords[i], ranges) -> 1
-                    else -> 2
-                } + if (exactIds.all { id -> id >= 0 && id in allWords[i] }) 0 else 3
+                val tier = if (exactIds.all { id -> id >= 0 && id in allWords[i] }) 0 else 1
                 val station = stations[i]
-                val dLat = station.lat - centreLat
-                val dLon = (station.lon - centreLon) * cosLat
+                val dLat = station.lat - refLat
+                val dLon = (station.lon - refLon) * cosLat
                 hits += StationHit(station, tier, station.id in ranking, dLat * dLat + dLon * dLon)
             }
         }
@@ -148,6 +156,7 @@ class StationSearch private constructor(
             municipalities = places.take(MAX_MUNICIPALITIES).map { it.second },
             stations = hits.take(MAX_STATIONS).map { it.station },
             stationMatches = hits.size,
+            placesFirst = placesFirst,
         )
     }
 
@@ -197,27 +206,21 @@ class StationSearch private constructor(
                 for (j in all.indices) if (j == 0 || all[j] != all[j - 1]) all[unique++] = all[j]
                 return all.copyOf(unique)
             }
-            val texts = HashMap<String, String>()
-            fun spacedOf(text: String) = texts.getOrPut(text) { SearchText.queryWords(text).joinToString(" ") }
-
             val stations = file.stations
-            val nameWords = arrayOfNulls<IntArray>(stations.size)
             val allWords = arrayOfNulls<IntArray>(stations.size)
-            val nameTexts = arrayOfNulls<Array<String>>(stations.size)
+            val brandCounts = IntArray(file.brands.size)
             val byMunicipality = LinkedHashMap<Pair<String, String>, MutableList<Station>>()
             for ((i, s) in stations.withIndex()) {
                 val brand = file.brands.getOrElse(s.brand) { "" }
-                val name = idsOf(s.name)
-                val brandIds = idsOf(brand)
-                nameWords[i] = union(name, brandIds)
-                allWords[i] = union(name, brandIds, idsOf(s.address), idsOf(s.municipality), idsOf(s.province))
-                nameTexts[i] = arrayOf(spacedOf(s.name), spacedOf(brand))
+                allWords[i] = union(idsOf(s.name), idsOf(brand), idsOf(s.address), idsOf(s.municipality), idsOf(s.province))
+                if (s.brand in brandCounts.indices) brandCounts[s.brand]++
                 byMunicipality.getOrPut(s.municipality.uppercase(Locale.ROOT) to s.province) { ArrayList() } += s
             }
             val municipalities = byMunicipality.map { (key, list) -> Municipality(list[0].municipality, key.second, list) }
             val municipalityWords = Array(municipalities.size) { i ->
                 union(idsOf(municipalities[i].name), idsOf(municipalities[i].province))
             }
+            val brandWords = Array(file.brands.size) { union(idsOf(file.brands[it])) }
             val municipalityCompact = Array(municipalities.size) { i ->
                 SearchText.queryWords(municipalities[i].name).joinToString("")
             }
@@ -231,9 +234,9 @@ class StationSearch private constructor(
             return StationSearch(
                 vocabulary = Array(words.size) { words[order[it]] },
                 stations = stations,
-                nameWords = Array(stations.size) { remap(nameWords[it]!!) },
                 allWords = Array(stations.size) { remap(allWords[it]!!) },
-                nameTexts = Array(stations.size) { nameTexts[it]!! },
+                brandWords = Array(file.brands.size) { remap(brandWords[it]) },
+                brandCounts = brandCounts,
                 municipalities = municipalities,
                 municipalityWords = Array(municipalities.size) { remap(municipalityWords[it]) },
                 municipalityCompact = municipalityCompact,

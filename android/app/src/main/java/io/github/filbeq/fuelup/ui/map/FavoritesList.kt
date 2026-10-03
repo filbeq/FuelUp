@@ -32,29 +32,24 @@ import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FavoriteStation
 import io.github.filbeq.fuelup.data.Favorites
 import io.github.filbeq.fuelup.data.FuelChoice
-import io.github.filbeq.fuelup.data.Geo
-import io.github.filbeq.fuelup.data.PlaceNames
 import io.github.filbeq.fuelup.data.RankedPrice
 import io.github.filbeq.fuelup.data.Station
 import io.github.filbeq.fuelup.data.StationsFile
 import io.github.filbeq.fuelup.data.UserPosition
 import io.github.filbeq.fuelup.data.station
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
-import kotlin.math.roundToInt
 
 /**
  * What the empty search needs for the favourites: the list, the data on
- * screen ([file], null until loaded), the user's position if "near me" found
- * one (for distances), and what to do with a favourite missing from the data.
+ * screen ([file], null until loaded), and what to do with a favourite missing
+ * from the data.
  */
 class FavoritesInSearch(
     val list: List<FavoriteStation>,
     val file: StationsFile?,
-    val position: UserPosition?,
     /** A missing favourite: show its last known spot. */
     val onShowSpot: (FavoriteStation) -> Unit,
     val onRemove: (Int) -> Unit,
@@ -80,6 +75,7 @@ fun LazyListScope.favoritesSection(
     favorites: FavoritesInSearch,
     choice: FuelChoice,
     ranking: Map<Int, RankedPrice>,
+    position: UserPosition?,
     onStationClick: (Station) -> Unit,
 ) {
     item(key = "favorites") {
@@ -109,31 +105,15 @@ fun LazyListScope.favoritesSection(
                 brand = row.favorite.brand,
                 price = ranking[station.id],
                 choice = choice,
-                where = favoriteWhere(row.favorite, favorites.position),
+                where = placeAndDistance(row.favorite.municipality, row.favorite.province, row.favorite.lat, row.favorite.lon, position),
                 now = now,
                 onClick = { onStationClick(station) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         } else {
-            MissingFavoriteRow(row, favorites)
+            MissingFavoriteRow(row, favorites, position)
         }
     }
-}
-
-/** "Pisa (PI) · 2,4 km": the municipality, and the distance when the position is known. */
-@Composable
-private fun favoriteWhere(favorite: FavoriteStation, position: UserPosition?): String {
-    val place = stringResource(R.string.place_with_province, PlaceNames.municipality(favorite.municipality), favorite.province)
-    if (position == null) return place
-    val km = Geo.distanceKm(position.lat, position.lon, favorite.lat, favorite.lon)
-    val locale = LocalConfiguration.current.locales[0]
-    // Favourites can be far away: whole km from 10 km ("250 km", not "250,4 km").
-    val distance = if (km >= 10) {
-        NumberFormat.getIntegerInstance(locale).format(km.roundToInt()) + " km"
-    } else {
-        formatDistance(km, position.accuracyMeters > PRECISE_METERS, locale)
-    }
-    return "$place · $distance"
 }
 
 /**
@@ -143,7 +123,7 @@ private fun favoriteWhere(favorite: FavoriteStation, position: UserPosition?): S
  * moves the star to it. Tapping the row shows the spot on the map.
  */
 @Composable
-private fun MissingFavoriteRow(row: FavoriteRow, favorites: FavoritesInSearch) {
+private fun MissingFavoriteRow(row: FavoriteRow, favorites: FavoritesInSearch, position: UserPosition?) {
     val favorite = row.favorite
     Column(Modifier.padding(horizontal = 16.dp)) {
         HorizontalDivider()
@@ -170,7 +150,7 @@ private fun MissingFavoriteRow(row: FavoriteRow, favorites: FavoritesInSearch) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    listOfNotNull(favorite.brand.takeIf { favorite.name.isNotEmpty() && it.isNotEmpty() }, favoriteWhere(favorite, favorites.position))
+                    listOfNotNull(favorite.brand.takeIf { favorite.name.isNotEmpty() && it.isNotEmpty() }, placeAndDistance(favorite.municipality, favorite.province, favorite.lat, favorite.lon, position))
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

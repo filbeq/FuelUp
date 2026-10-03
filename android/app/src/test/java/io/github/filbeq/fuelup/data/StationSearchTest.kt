@@ -96,16 +96,46 @@ class StationSearchTest {
 
     @Test
     fun brandSearchSellersFirstThenNearest() {
-        // Names starting with "eni": sellers of the chosen fuel by distance from Pisa, then
-        // the others; then the Eni-branded station whose name doesn't start with it.
-        assertEquals(listOf(9, 1, 6, 7, 2), stationIds("eni"))
+        // Name or brand, no matter where the word is: sellers of the chosen fuel by distance
+        // from Pisa, then the others by distance (Reggio Emilia's S.ILARIO, Agip Eni, before Marche).
+        assertEquals(listOf(9, 1, 6, 2, 7), stationIds("eni"))
     }
 
     @Test
-    fun wholeWordsComeFirstThenNameMatches() {
-        // The whole word in the name (9, 1: nearest first), then anywhere else (3, in Pisa),
-        // then the start of a longer word ("PISANO").
-        assertEquals(listOf(9, 1, 3, 8), stationIds("pisa"))
+    fun distanceIsFromTheGivenPoint() {
+        // From Sant'Elpidio a Mare instead of Pisa: the non-seller there comes after the sellers,
+        // and the sellers are now ordered from the Marche.
+        assertEquals(listOf(6, 9, 1, 7, 2), search.search("eni", ranking, 43.23, 13.69).stations.map { it.id })
+    }
+
+    @Test
+    fun wholeWordsComeFirstNearestFirst() {
+        // The whole word anywhere (3, 9, 1 are in Pisa: nearest first), then the start of a longer word ("PISANO").
+        assertEquals(listOf(3, 9, 1, 8), stationIds("pisa"))
+    }
+
+    @Test
+    fun anExactMunicipalityNameIsAPlace() {
+        assertTrue(find("pisa").placesFirst)
+        assertTrue(find("forli").placesFirst)
+    }
+
+    @Test
+    fun aBrandBeatsTownsWithFewerStations() {
+        // Like "api": the Api-Ip brand has more stations than Apiro and Apice together.
+        val brands = listOf("Api-Ip", "San Marco Petroli")
+        val data = (1..5).map { station(it, "STAZIONE $it", 0, "VIA X", "PISA", "PI", 43.7, 10.4) } +
+            station(6, "BAR SPORT", 1, "VIA Y", "APIRO", "MC", 43.4, 13.1) +
+            station(7, "DISTRIBUTORE", 1, "VIA Z", "APICE", "BN", 41.1, 14.9) +
+            (8..10).map { station(it, "DISTRIBUTORE $it", 0, "VIA W", "SAN MINIATO", "PI", 43.68, 10.85) }
+        val apiSearch = StationSearch.build(StationsFile(1, "2026-10-02", brands, emptyList(), data))
+        val api = apiSearch.search("api", emptyMap(), 43.7, 10.4)
+        assertEquals(false, api.placesFirst)
+        assertEquals(listOf("APICE", "APIRO"), api.municipalities.map { it.name })
+        // A town's exact name is always a place, however big the brand.
+        assertTrue(apiSearch.search("apiro", emptyMap(), 43.7, 10.4).placesFirst)
+        // "san": 3 stations in San Miniato against 2 of the San Marco Petroli brand: a place.
+        assertTrue(apiSearch.search("san", emptyMap(), 43.7, 10.4).placesFirst)
     }
 
     @Test
