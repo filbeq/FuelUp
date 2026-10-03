@@ -1,12 +1,15 @@
 package io.github.filbeq.fuelup.ui.map
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,9 +18,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -31,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -39,7 +45,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.FuelKind
@@ -48,6 +58,7 @@ import io.github.filbeq.fuelup.data.PriceRanking
 import io.github.filbeq.fuelup.data.ServiceMode
 import io.github.filbeq.fuelup.map.StationIcons
 import io.github.filbeq.fuelup.ui.station.choiceLabel
+import io.github.filbeq.fuelup.ui.theme.fuelColor
 
 /**
  * Floating button over the map, like Google Maps' map-type button, that always
@@ -98,13 +109,23 @@ fun FuelChoiceSheet(choice: FuelChoice, onChoiceChange: (FuelChoice) -> Unit, on
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PanelTitle(R.string.fuel_panel_title)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FuelChoice.SELECTABLE.forEach { kind ->
-                    FilterChip(
-                        selected = choice.fuel == kind,
-                        onClick = { onChoiceChange(choice.copy(fuel = kind)) },
-                        label = { Text(stringResource(fuelLabel(kind))) },
-                    )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val kinds = FuelChoice.SELECTABLE
+                val tileWidth = (maxWidth - TILE_GAP * (kinds.size - 1)) / kinds.size
+                val labelSize = uniformLabelSize(
+                    labels = kinds.map { stringResource(fuelLabel(it)) },
+                    width = tileWidth - (TILE_LABEL_PADDING + TILE_BORDER) * 2,
+                )
+                Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                    kinds.forEach { kind ->
+                        FuelTile(
+                            kind = kind,
+                            selected = choice.fuel == kind,
+                            labelSize = labelSize,
+                            onClick = { onChoiceChange(choice.copy(fuel = kind)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
             // Same height either way, so the chips above don't jump when the fuel changes.
@@ -135,6 +156,86 @@ fun FuelChoiceSheet(choice: FuelChoice, onChoiceChange: (FuelChoice) -> Unit, on
         }
     }
 }
+
+/**
+ * One fuel: a pump in the fuel's colour ([fuelColor], only used here) with its
+ * name below. The selected tile has a thick outline, a tinted background and a
+ * check mark, so it stands out without relying on colour.
+ */
+@Composable
+private fun FuelTile(kind: FuelKind, selected: Boolean, labelSize: TextUnit, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        shape = MaterialTheme.shapes.medium,
+        color = if (selected) colors.secondaryContainer else Color.Transparent,
+        border = if (selected) BorderStroke(TILE_BORDER, colors.primary) else BorderStroke(1.dp, colors.outlineVariant),
+    ) {
+        Box {
+            Column(
+                Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_local_gas_station),
+                    contentDescription = null,
+                    tint = fuelColor(kind, dark = isSystemInDarkTheme()),
+                    modifier = Modifier.size(32.dp),
+                )
+                Text(
+                    stringResource(fuelLabel(kind)),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = labelSize),
+                    color = if (selected) colors.onSecondaryContainer else colors.onSurface,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = TILE_LABEL_PADDING),
+                )
+            }
+            if (selected) {
+                Icon(
+                    painterResource(R.drawable.ic_check),
+                    contentDescription = null,
+                    tint = colors.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(18.dp)
+                        .background(colors.primary, CircleShape)
+                        .padding(2.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One text size for all tile labels: the largest, from labelLarge down to
+ * [MIN_LABEL_SIZE], at which the longest label fits [width]. All tiles look
+ * alike at every font scale and in every language.
+ */
+@Composable
+private fun uniformLabelSize(labels: List<String>, width: Dp): TextUnit {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge
+    val widthPx = with(LocalDensity.current) { width.roundToPx() }
+    return remember(labels, widthPx, style, measurer) {
+        var size = style.fontSize.value
+        while (size > MIN_LABEL_SIZE.value) {
+            val fits = labels.all { label ->
+                measurer.measure(label, style.copy(fontSize = size.sp), maxLines = 1, softWrap = false).size.width <= widthPx
+            }
+            if (fits) break
+            size -= 0.5f
+        }
+        size.coerceAtLeast(MIN_LABEL_SIZE.value).sp
+    }
+}
+
+private val TILE_GAP = 8.dp
+private val TILE_BORDER = 2.dp
+private val TILE_LABEL_PADDING = 4.dp
+private val MIN_LABEL_SIZE = 10.sp
 
 @Composable
 private fun PanelTitle(@StringRes title: Int, modifier: Modifier = Modifier) {

@@ -3,6 +3,7 @@ package io.github.filbeq.fuelup.ui.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import io.github.filbeq.fuelup.data.FuelKind
 
 // FuelUp palette "Ink blue": Material 3 schemes generated from seed #2F5DA8 with
 // Google's Material colour algorithm (hue 265). UI colours stay away from the
@@ -25,6 +26,25 @@ val LocationColorLight = Color(0xFF0B57D0)
 val LocationColorDark = Color(0xFFA8C7FA)
 val LocationHaloLight = Color(0xFFFFFFFF)
 val LocationHaloDark = Color(0xFF14171C)
+
+/**
+ * Fuel colours, used only for the fuel tiles in the fuel selector panel, never
+ * on the map (the map button keeps a neutral icon, so no green pump sits among
+ * the green "cheap" markers). The one exception to the "no green" UI rule is
+ * Benzina's conventional green. Checked on the panel backgrounds (tile and
+ * selected tile): icon contrast >= 3.7:1, and ΔE2000 >= 20 from the price
+ * colours under normal vision and >= 10 under simulated protan/deutan/tritan
+ * vision (Benzina exempt from "cheap"). Light theme needs darker tones, so the
+ * light Gasolio is a deep ochre rather than yellow.
+ */
+fun fuelColor(kind: FuelKind, dark: Boolean): Color = when (kind) {
+    FuelKind.PETROL -> if (dark) Color(0xFF7BC67E) else Color(0xFF1B5E20) // green
+    FuelKind.DIESEL -> if (dark) Color(0xFFE2B714) else Color(0xFF7A5200) // ochre yellow
+    FuelKind.LPG -> if (dark) Color(0xFFE39CF5) else Color(0xFF8E24AA) // purple
+    FuelKind.CNG -> if (dark) Color(0xFF5BC0F2) else Color(0xFF0277BD) // azure
+    FuelKind.LNG -> if (dark) Color(0xFF9FA8FF) else Color(0xFF283593) // indigo (liquefied methane)
+    FuelKind.OTHER -> if (dark) Color(0xFFC4C6D0) else Color(0xFF44474F) // neutral, never shown
+}
 
 val LightColors = lightColorScheme(
     primary = Color(0xFF2F5DA8),
