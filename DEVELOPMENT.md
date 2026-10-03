@@ -734,4 +734,6 @@ station, brand); favourites (star, list, map star, kept after restart); near
 me (permission, radius, sort, opening on the position at the next start);
 Settings (theme, map style, language, Update data now); About; rotation and
 side panel; compass; process death on Settings (Home, `adb shell am kill
-io.github.filbeq.fuelup`, reopen: Settings is back); offline start.
+io.github.filbeq.fuelup`, reopen: Settings is back; check the screen before
+the kill, a Back too many leaves the app and the test proves nothing); offline
+start.

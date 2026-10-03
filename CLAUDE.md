@@ -489,7 +489,11 @@ personal use on the test phone. Done in step 8 so far:
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
 Step 9 (first GitHub pre-release, 0.1.0): release build, signing, release
-workflow, licence, README done; release test on the phone and the tag pending.
+workflow, licence, README done; release build tested on the phone on
+2026-10-03 (checklist in DEVELOPMENT.md passed, no crash; R8 needed no keep
+rules; compass untested, adb can't rotate the map). Found and fixed on the
+way: black search results in the dark theme, library pseudo-locale texts.
+Pending: workflow dry run (needs the owner's secrets) and the v0.1.0 tag.
 
 Next: the rest of step 8 (see the backlog below).
 
