@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -95,6 +96,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
+    /** Another screen is on top: Back and accessibility belong to it. */
+    covered: Boolean,
     state: MapUiState,
     onRetry: () -> Unit,
     onChoiceChange: (FuelChoice) -> Unit,
@@ -189,7 +192,7 @@ fun MapScreen(
         if (selectedStationId != null && state.snapshot != null && details == null) currentOnDismiss()
     }
     // Back: expanded → collapsed → closed; a station opened from "near me" goes back to it.
-    BackHandler(enabled = sheetWanted) {
+    BackHandler(enabled = sheetWanted && !covered) {
         scope.launch {
             when {
                 sheetState.currentValue == SheetValue.Expanded -> sheetState.partialExpand()
@@ -268,6 +271,8 @@ fun MapScreen(
     }
 
     BottomSheetScaffold(
+        // Behind another screen: hidden from TalkBack, which would otherwise read the map too.
+        modifier = if (covered) Modifier.clearAndSetSemantics { } else Modifier,
         scaffoldState = scaffoldState,
         sheetPeekHeight = peekHeight,
         sheetDragHandle = {

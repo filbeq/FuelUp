@@ -1,5 +1,6 @@
 package io.github.filbeq.fuelup.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,11 +9,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.map.MapCamera
 import io.github.filbeq.fuelup.ui.about.AboutScreen
 import io.github.filbeq.fuelup.ui.map.MapScreen
@@ -36,8 +35,14 @@ data object AboutRoute : NavKey
  * Top-level UI. Navigation 3 keeps the back stack (a saved list of screens,
  * starting with the map) and handles system Back between screens.
  *
- * The map's data (ViewModel), camera and selected station live here, above
- * the navigation, so they survive moving to another screen and back.
+ * The map screen lives here too, outside the navigation and underneath it:
+ * other screens are drawn over it, so the map (and its loaded style, sheet and
+ * "near me" list) stays alive and is back at once, without a ~1 s reload. The
+ * map's own back-stack entry is an empty placeholder.
+ *
+ * The map is not paused while covered: MapLibre draws only when something
+ * changes, so an idle map behind Settings costs next to nothing, and pausing it
+ * made it flash dark on the way back after the app had been in the background.
  */
 @Composable
 fun FuelUpApp(
@@ -51,55 +56,55 @@ fun FuelUpApp(
     var camera by rememberSaveable(stateSaver = MapCamera.Saver) { mutableStateOf(MapCamera.Italy) }
     var selectedStationId by rememberSaveable { mutableStateOf<Int?>(null) }
     val backStack = rememberNavBackStack(MapRoute)
+    // Another screen is on top: the map gives up Back and accessibility.
+    val mapCovered = backStack.last() != MapRoute
 
-    NavDisplay(
-        backStack = backStack,
-        onBack = { if (backStack.size > 1) popBackStack(backStack) },
-        entryProvider = entryProvider {
-            entry<MapRoute> {
-                MapScreen(
-                    state = mapState,
-                    onRetry = mapViewModel::retry,
-                    onChoiceChange = mapViewModel::setChoice,
-                    mapStyle = settings.mapStyle,
-                    camera = camera,
-                    onCameraChange = { camera = it },
-                    selectedStationId = selectedStationId,
-                    onStationClick = { selectedStationId = it },
-                    onDismissStation = { selectedStationId = null },
-                    onOpenSettings = { backStack.add(SettingsRoute) },
-                    onOpenAbout = { backStack.add(AboutRoute) },
-                    nearMe = nearMe,
-                    onOpenNearMe = {
-                        selectedStationId = null
-                        nearMeViewModel.open()
-                    },
-                    onLocate = nearMeViewModel::locate,
-                    onLocationDenied = nearMeViewModel::denied,
-                    onCloseNearMe = nearMeViewModel::close,
-                    onRadiusChange = nearMeViewModel::setRadius,
-                    onSortChange = nearMeViewModel::setSort,
-                )
-            }
-            entry<SettingsRoute> {
-                SettingsScreen(
-                    settings = settings,
-                    language = settingsViewModel.language(),
-                    onThemeChange = settingsViewModel::setTheme,
-                    onMapStyleChange = settingsViewModel::setMapStyle,
-                    onLanguageChange = settingsViewModel::setLanguage,
-                    onOpenAbout = { backStack.add(AboutRoute) },
-                    onBack = { popBackStack(backStack) },
-                )
-            }
-            entry<AboutRoute> {
-                AboutScreen(onBack = { popBackStack(backStack) })
-            }
-        },
-    )
-}
-
-private fun popBackStack(backStack: NavBackStack<NavKey>) {
-    backStack.removeAt(backStack.lastIndex)
-    if (backStack.last() == MapRoute) PerfLog.mark("back to map")
+    Box {
+        MapScreen(
+            covered = mapCovered,
+            state = mapState,
+            onRetry = mapViewModel::retry,
+            onChoiceChange = mapViewModel::setChoice,
+            mapStyle = settings.mapStyle,
+            camera = camera,
+            onCameraChange = { camera = it },
+            selectedStationId = selectedStationId,
+            onStationClick = { selectedStationId = it },
+            onDismissStation = { selectedStationId = null },
+            onOpenSettings = { backStack.add(SettingsRoute) },
+            onOpenAbout = { backStack.add(AboutRoute) },
+            nearMe = nearMe,
+            onOpenNearMe = {
+                selectedStationId = null
+                nearMeViewModel.open()
+            },
+            onLocate = nearMeViewModel::locate,
+            onLocationDenied = nearMeViewModel::denied,
+            onCloseNearMe = nearMeViewModel::close,
+            onRadiusChange = nearMeViewModel::setRadius,
+            onSortChange = nearMeViewModel::setSort,
+        )
+        NavDisplay(
+            backStack = backStack,
+            onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+            entryProvider = entryProvider {
+                // Nothing to draw: the map is underneath.
+                entry<MapRoute> { }
+                entry<SettingsRoute> {
+                    SettingsScreen(
+                        settings = settings,
+                        language = settingsViewModel.language(),
+                        onThemeChange = settingsViewModel::setTheme,
+                        onMapStyleChange = settingsViewModel::setMapStyle,
+                        onLanguageChange = settingsViewModel::setLanguage,
+                        onOpenAbout = { backStack.add(AboutRoute) },
+                        onBack = { backStack.removeAt(backStack.lastIndex) },
+                    )
+                }
+                entry<AboutRoute> {
+                    AboutScreen(onBack = { backStack.removeAt(backStack.lastIndex) })
+                }
+            },
+        )
+    }
 }

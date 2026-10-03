@@ -17,24 +17,6 @@ object PerfLog {
         if (BuildConfig.DEBUG) Log.d(TAG, message)
     }
 
-    // Start of a measurement that ends somewhere else (see [mark] and [endMark]).
-    private var markLabel: String? = null
-    private var markStart = 0L
-
-    /** Starts a measurement ended later by [endMark], e.g. "back to map" → first map frame. */
-    fun mark(label: String) {
-        if (!BuildConfig.DEBUG) return
-        markLabel = label
-        markStart = System.nanoTime()
-    }
-
-    /** Logs the time since [mark], if one is pending, and clears it. */
-    fun endMark(what: String) {
-        val label = markLabel ?: return
-        markLabel = null
-        log("$label → $what: ${(System.nanoTime() - markStart) / 1_000_000} ms")
-    }
-
     inline fun <T> time(label: String, block: () -> T): T {
         if (!BuildConfig.DEBUG) return block()
         val start = System.nanoTime()
