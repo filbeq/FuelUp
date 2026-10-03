@@ -2,6 +2,7 @@ package io.github.filbeq.fuelup.map
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
 import androidx.core.graphics.createBitmap
@@ -47,6 +48,7 @@ import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconOffset
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.iconTextFit
 import org.maplibre.android.style.layers.PropertyFactory.symbolSortKey
@@ -67,7 +69,9 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 
 /**
  * Texts for map labels in the app language: [localeTag] for number formatting
@@ -87,6 +91,8 @@ data class StationColors(
     val labelText: Int,
     /** Halo around map labels; also the background of the cluster price pill. */
     val labelHalo: Int,
+    /** Outline of the favourite star (drawn in [cluster]): the opposite tone of the map. */
+    val favoriteOutline: Int,
 )
 
 /**
@@ -112,6 +118,11 @@ object StationLayers {
     private const val PRICE_LAYER_ID = "fuelup-station-price"
     private const val STATION_LAYER_ID = "fuelup-station"
     private const val SELECTED_LAYER_ID = "fuelup-selected"
+    private const val FAVORITE_LAYER_ID = "fuelup-favorite"
+    private const val FAVORITE_IMAGE = "fuelup-favorite-star"
+    /** The star's size and where it sits: at the top right of the 20 dp marker, half outside the selection ring. */
+    private const val FAVORITE_STAR_DP = 13f
+    private const val FAVORITE_OFFSET_DP = 11f
     /** A selected station without a marker (it doesn't sell the chosen fuel): its own point. */
     private const val OFF_MAP_SOURCE_ID = "fuelup-selected-off-map"
     private const val OFF_MAP_DOT_LAYER_ID = "fuelup-selected-off-map-dot"
@@ -298,6 +309,20 @@ object StationLayers {
                 .withFilter(selectedFilter(NO_STATION))
                 .withProperties(*selectedRing(colors)),
         )
+        // A small star on the marker's top-right edge for favourites (none: matches
+        // nothing), above the selection ring. In the cluster colour, so it can't be
+        // mistaken for a price class.
+        style.addImage(FAVORITE_IMAGE, drawStar(colors, density))
+        style.addLayer(
+            SymbolLayer(FAVORITE_LAYER_ID, SOURCE_ID)
+                .withFilter(favoriteFilter(emptySet()))
+                .withProperties(
+                    iconImage(FAVORITE_IMAGE),
+                    iconOffset(arrayOf(FAVORITE_OFFSET_DP, -FAVORITE_OFFSET_DP)),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true),
+                ),
+        )
         // A station picked in the search that has no marker (it doesn't sell the
         // chosen fuel): a plain hollow dot, like "not compared", inside the same ring.
         style.addSource(GeoJsonSource(OFF_MAP_SOURCE_ID))
@@ -386,6 +411,49 @@ object StationLayers {
     }
 
     private fun selectedFilter(id: Int) = all(not(has("point_count")), eq(get(ID_PROPERTY), id))
+
+    /** Puts the favourite star on stations [ids]. */
+    fun setFavorites(style: Style, ids: Set<Int>) {
+        val layer = style.getLayerAs<SymbolLayer>(FAVORITE_LAYER_ID) ?: return
+        layer.setFilter(favoriteFilter(ids))
+    }
+
+    private fun favoriteFilter(ids: Set<Int>) = if (ids.isEmpty()) {
+        selectedFilter(NO_STATION)
+    } else {
+        all(not(has("point_count")), Expression.`in`(get(ID_PROPERTY), literal(ids.toTypedArray<Any>())))
+    }
+
+    /** A five-pointed star in the cluster colour with an outline in the map's opposite tone. */
+    private fun drawStar(colors: StationColors, density: Float): android.graphics.Bitmap {
+        val size = (FAVORITE_STAR_DP * density).toInt()
+        val bitmap = createBitmap(size, size)
+        val outline = 1.5f * density
+        val outer = size / 2f - outline
+        val inner = outer * 0.45f
+        val path = Path()
+        for (i in 0 until 10) {
+            val r = if (i % 2 == 0) outer else inner
+            val angle = Math.PI / 5 * i - Math.PI / 2
+            val x = size / 2f + (r * cos(angle)).toFloat()
+            // Slightly lower: a star's visual centre is below its outer circle's.
+            val y = size / 2f + outline / 2 + (r * sin(angle)).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.favoriteOutline
+            style = Paint.Style.STROKE
+            strokeWidth = outline * 2
+            strokeJoin = Paint.Join.ROUND
+        }
+        canvas.drawPath(path, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = colors.cluster
+        canvas.drawPath(path, paint)
+        return bitmap
+    }
 
     /** Shows a selected station that has no marker at [lat], [lon]; null clears it. */
     fun setSelectedOffMap(style: Style, position: Pair<Double, Double>?) {

@@ -317,7 +317,7 @@ fun formatDistance(km: Double, approximate: Boolean, locale: Locale): String = w
 }
 
 /** Above this reported accuracy, distances are shown as approximate. */
-private const val PRECISE_METERS = 500f
+internal const val PRECISE_METERS = 500f
 
 @Composable
 private fun classText(priceClass: PriceClass): String = stringResource(

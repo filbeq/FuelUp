@@ -83,6 +83,9 @@ fun FuelUpApp(
             onCloseNearMe = nearMeViewModel::close,
             onRadiusChange = nearMeViewModel::setRadius,
             onSortChange = nearMeViewModel::setSort,
+            onToggleFavorite = mapViewModel::toggleFavorite,
+            onRemoveFavorite = mapViewModel::removeFavorite,
+            onReplaceFavorite = mapViewModel::replaceFavorite,
         )
         NavDisplay(
             backStack = backStack,

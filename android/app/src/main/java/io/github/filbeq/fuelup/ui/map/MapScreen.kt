@@ -78,6 +78,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.R
+import io.github.filbeq.fuelup.data.FavoriteStation
 import io.github.filbeq.fuelup.data.FuelChoice
 import io.github.filbeq.fuelup.data.MapStyleMode
 import io.github.filbeq.fuelup.data.Municipality
@@ -148,6 +149,9 @@ fun MapScreen(
     onCloseNearMe: () -> Unit,
     onRadiusChange: (Int) -> Unit,
     onSortChange: (NearbySort) -> Unit,
+    onToggleFavorite: (Int) -> Unit,
+    onRemoveFavorite: (Int) -> Unit,
+    onReplaceFavorite: (FavoriteStation, Int) -> Unit,
 ) {
     val provider = CurrentMapProvider
     val scope = rememberCoroutineScope()
@@ -271,7 +275,11 @@ fun MapScreen(
     }
 
     // Another station, or back to the list: like the sheet, which shows it collapsed.
+    // The last known spot of a favourite missing from the data, shown from the
+    // search as a hollow dot (like a station without a marker); null = none.
+    var missingSpot by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     val selectStation = { id: Int ->
+        missingSpot = null
         onStationClick(id)
         if (wide) sheetExpanded = false
     }
@@ -302,6 +310,7 @@ fun MapScreen(
     // An empty spot on the map: leave the station (back to what was there before),
     // else lower the "near me" list.
     val onMapTapEmpty = {
+        missingSpot = null
         when {
             selectedStationId != null -> leaveStation()
             listShown -> nearbyMinimised = true
@@ -456,6 +465,15 @@ fun MapScreen(
             moveCamera(CameraMove.Show(lat, lon, minZoom = STATION_ZOOM, topPx = topControlsPx, bottomPx = freeBottomPx(), leftPx = panelCoverPx))
         }
     }
+    // A favourite missing from the data: its last known spot, nothing selected.
+    val showSpot = { lat: Double, lon: Double ->
+        onMapTapEmpty()
+        missingSpot = lat to lon
+        scope.launch {
+            awaitSheetSettled()
+            moveCamera(CameraMove.Show(lat, lon, minZoom = STATION_ZOOM, topPx = topControlsPx, bottomPx = freeBottomPx(), leftPx = if (nearMe.open) panelCoverPx else 0))
+        }
+    }
     // A municipality from the search: like a tap on empty map (leave the station,
     // lower the "near me" list), then frame all its stations.
     val openMunicipality = { municipality: Municipality ->
@@ -486,6 +504,17 @@ fun MapScreen(
             choice = state.choice,
             ranking = state.ranking,
             brands = state.snapshot?.stations?.brands.orEmpty(),
+            favorites = FavoritesInSearch(
+                list = state.favorites,
+                file = state.snapshot?.stations,
+                position = nearMe.position,
+                onShowSpot = { favorite ->
+                    scope.launch { searchBarState.animateToCollapsed() }
+                    showSpot(favorite.lat, favorite.lon)
+                },
+                onRemove = onRemoveFavorite,
+                onReplace = { favorite, station -> onReplaceFavorite(favorite, station.id) },
+            ),
             onMunicipalityClick = { municipality ->
                 scope.launch { searchBarState.animateToCollapsed() }
                 openMunicipality(municipality)
@@ -507,6 +536,8 @@ fun MapScreen(
                 choice = state.choice,
                 ranked = state.ranking[station.id],
                 onOpenStation = selectStation,
+                favorite = state.favorites.any { it.id == station.id },
+                onToggleFavorite = { onToggleFavorite(station.id) },
                 modifier = Modifier.onSizeChanged { size -> headerHeightPx = size.height },
                 closeButton = closeButton,
             )
@@ -565,13 +596,16 @@ fun MapScreen(
                     selected = MaterialTheme.colorScheme.tertiary.toArgb(),
                     labelText = MaterialTheme.colorScheme.onSurface.toArgb(),
                     labelHalo = MaterialTheme.colorScheme.surface.toArgb(),
+                    favoriteOutline = (if (mapIsDark) LocationHaloDark else LocationHaloLight).toArgb(),
                 ),
                 labelFont = provider.labelFont,
                 mapLabels = mapLabels(),
                 labelLanguage = LabelLanguage.forLocale(LocalConfiguration.current.locales[0]),
                 selectedStationId = selectedStationId,
                 // A station picked in the search that has no marker (doesn't sell the chosen fuel).
-                selectedOffMap = details?.takeIf { it.id !in state.ranking }?.let { it.lat to it.lon },
+                favoriteIds = remember(state.favorites) { state.favorites.mapTo(HashSet()) { it.id } },
+                // Or a missing favourite's last known spot.
+                selectedOffMap = details?.takeIf { it.id !in state.ranking }?.let { it.lat to it.lon } ?: missingSpot,
                 onStationClick = { id ->
                     selectStation(id)
                     // A station under the side panel's place or the controls: bring it out beside / below them.
@@ -636,6 +670,7 @@ fun MapScreen(
             FloatingActionButton(
                 onClick = {
                     nearbyMinimised = false
+                    missingSpot = null
                     onOpenNearMe()
                     requestLocation()
                 },

@@ -170,4 +170,10 @@
     <string name="station_not_selling">Non vende %1$s</string>
     <string name="action_clear_search">Cancella la ricerca</string>
     <string name="action_close_search">Chiudi la ricerca</string>
+    <string name="action_add_favorite">Aggiungi ai preferiti</string>
+    <string name="action_remove_favorite">Rimuovi dai preferiti</string>
+    <string name="favorites_title">Preferiti</string>
+    <string name="favorites_empty">Tocca la stella su un distributore per ritrovarlo qui.</string>
+    <string name="favorite_missing_since">Non presente nei dati dal %1$s</string>
+    <string name="favorite_at_spot_now">Ora in questo punto: %1$s</string>
 </resources>

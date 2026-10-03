@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,7 +64,8 @@ import java.time.format.DateTimeFormatter
  * (name, brand, and the price of the chosen fuel with how it compares).
  * [StationSheetBody] follows it when expanded. [ranked] is the station's
  * price for [choice] (null if it doesn't sell it). Other stations at the same
- * spot are listed underneath; tapping one calls [onOpenStation]. [closeButton]
+ * spot are listed underneath; tapping one calls [onOpenStation]. The star
+ * after the name adds or removes the station from the favourites. [closeButton]
  * is the side panel's, at the end of the name's line.
  */
 @Composable
@@ -72,6 +74,8 @@ fun StationSheetHeader(
     choice: FuelChoice,
     ranked: RankedPrice?,
     onOpenStation: (Int) -> Unit,
+    favorite: Boolean,
+    onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
     closeButton: (@Composable () -> Unit)? = null,
 ) {
@@ -84,6 +88,7 @@ fun StationSheetHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
+            FavoriteButton(favorite, onToggleFavorite)
             closeButton?.invoke()
         }
         val subtitle = buildList {
@@ -113,6 +118,21 @@ fun StationSheetHeader(
                 )
             }
         }
+    }
+}
+
+/**
+ * Star on/off. The shape carries the state (outline / filled), not only the
+ * colour; ink blue like the rest of the UI (no yellow: too close to the price colours).
+ */
+@Composable
+private fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit) {
+    IconToggleButton(checked = favorite, onCheckedChange = { onToggle() }) {
+        Icon(
+            painterResource(if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline),
+            contentDescription = stringResource(if (favorite) R.string.action_remove_favorite else R.string.action_add_favorite),
+            tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

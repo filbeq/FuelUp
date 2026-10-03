@@ -90,13 +90,14 @@ fun MapSearchExpanded(
     choice: FuelChoice,
     ranking: Map<Int, RankedPrice>,
     brands: List<String>,
+    favorites: FavoritesInSearch,
     onMunicipalityClick: (Municipality) -> Unit,
     onStationClick: (Station) -> Unit,
 ) {
     val inputField = @Composable { SearchInput(searchBarState, textFieldState) }
     val colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     val content = @Composable {
-        SearchResultsList(ready, query, results, choice, ranking, brands, onMunicipalityClick, onStationClick)
+        SearchResultsList(ready, query, results, choice, ranking, brands, favorites, onMunicipalityClick, onStationClick)
     }
     if (docked) {
         ExpandedDockedSearchBar(state = searchBarState, inputField = inputField, colors = colors) { content() }
@@ -147,6 +148,7 @@ private fun SearchResultsList(
     choice: FuelChoice,
     ranking: Map<Int, RankedPrice>,
     brands: List<String>,
+    favorites: FavoritesInSearch,
     onMunicipalityClick: (Municipality) -> Unit,
     onStationClick: (Station) -> Unit,
 ) {
@@ -169,7 +171,11 @@ private fun SearchResultsList(
     val more = results?.takeIf { it.stationMatches > it.stations.size }?.let {
         pluralStringResource(R.plurals.search_more, it.stationMatches, it.stations.size, it.stationMatches)
     }
+    // With nothing typed (Google Maps style): the favourites first, once the data is there.
+    val showFavorites = typed == 0 && favorites.file != null
+    val favoriteRows = rememberFavoriteRows(favorites)
     LazyColumn(Modifier.fillMaxWidth().imePadding(), state = listState) {
+        if (showFavorites) favoritesSection(favoriteRows, favorites, choice, ranking, onStationClick)
         if (message != null) {
             item { SearchMessage(message) }
             return@LazyColumn

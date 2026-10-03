@@ -115,8 +115,10 @@ fun MapLibreMap(
     labelLanguage: String,
     /** Station drawn as selected (highlight ring), or null. */
     selectedStationId: Int?,
-    /** Where the selected station is when it has no marker of its own (`lat` to `lon`), else null. */
+    /** Where the selected station is when it has no marker of its own, or a missing favourite's last known spot (`lat` to `lon`); else null. */
     selectedOffMap: Pair<Double, Double>?,
+    /** Stations marked with the favourite star. */
+    favoriteIds: Set<Int>,
     /** Called with the id of a tapped station. Taps on clusters zoom in. */
     onStationClick: (Int) -> Unit,
     /** A tap that hit no station and no cluster. */
@@ -200,6 +202,10 @@ fun MapLibreMap(
 
     LaunchedEffect(loadedStyle, selectedStationId) {
         loadedStyle?.let { StationLayers.setSelected(it, selectedStationId) }
+    }
+
+    LaunchedEffect(loadedStyle, favoriteIds) {
+        loadedStyle?.let { StationLayers.setFavorites(it, favoriteIds) }
     }
 
     LaunchedEffect(loadedStyle, selectedOffMap) {
