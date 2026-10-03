@@ -169,6 +169,7 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
 | `java/…/ui/map/MapScreen.kt` | Full-screen map, station sheet (non-modal) or side panel on wide windows, credits that follow them, status bar icons |
+| `java/…/ui/map/CompassButton.kt` | Compass button above the my-location button (only while the map is rotated or tilted) |
 | `java/…/ui/map/MapTopControls.kt` | Search bar, settings button, date pill and fuel button over the top of the map (one row or two) |
 | `java/…/ui/map/MapSearch.kt` | The search bar and its results (full screen, or dropping down on wide windows) |
 | `java/…/data/StationSearch.kt` | Offline search over stations and municipalities: matching and ranking |
@@ -425,6 +426,12 @@ bar. Settings and About keep their own top bar with Back.
   panel, gear, pill centred in the rest, fuel button at the right end); if the
   pill and the fuel button don't fit there, they move to a second row on the
   right. Measured, so longer labels (e.g. "Benzina · Servito") fall back by themselves.
+- **Compass:** MapLibre's own compass is turned off (it sat under the search
+  bar). While the map is rotated or tilted, a small round button with a needle
+  appears above the my-location button and moves with it; tapping it turns
+  the map back to north up, flat. To test without two-finger gestures (adb
+  can't make them), temporarily add `.bearing(45.0)` to the start camera in
+  `MapLibreMap.kt` (don't commit it).
 - **Status bar:** its icons follow the map (dark icons on the light map,
   light on the dark one; the app theme while Settings or About is open), over
   a faint wash of the map's own tone so place names don't mix with the clock.

@@ -294,6 +294,17 @@ small enough to be tested on a real phone before moving on.
 - Debug builds are arm64-only to keep installs small; release keeps all ABIs.
 - Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
   (system default unless chosen in Settings); no dynamic colour.
+- Compass (step 8.8): MapLibre's own compass is off (it sat under the search
+  bar, untappable). Our `ui/map/CompassButton.kt`: 40 dp round button, same
+  surface and 2 dp shadow as the other controls, centred 12 dp above the
+  my-location FAB and moving with it (`fabPlace`: lifted above the sheet,
+  beside a side navigation bar); shown only while bearing or tilt > 0.5°
+  (fade); needle north half ink blue (never red), turned at draw time (no
+  recomposition per frame); tap = `CameraMove.ResetNorth` (bearing 0, tilt 0,
+  400 ms). Label "Reset to north" / "Riorienta a nord". `LIFT_CLEARANCE`
+  200 dp so a tall sheet covers the compass rather than pushing it into the
+  top controls. adb can't rotate the map: tested with a temporary build
+  opening at bearing 45°.
 - Floating surfaces (step 8.7): search bar, gear, date pill, fuel button,
   bottom sheet and side panel share `floatingSurfaceColor()` (`ui/theme/Theme.kt`):
   white (`surfaceContainerLowest`) in the light theme, `surfaceContainerHigh`
@@ -452,6 +463,8 @@ personal use on the test phone. Done in step 8 so far:
   checked on the phone (light/dark, landscape, launch logs) and the tablet
   emulator (no permission: no dialog at launch). The > 500 m re-frame path is
   unit-tested only (on the phone the fresh fix matched the last-known one).
+- 8.8: own compass button (see "Compass"); checked on the phone in portrait
+  and landscape.
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 
