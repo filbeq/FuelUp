@@ -23,6 +23,10 @@
     <string name="about_open_license">Apri la licenza</string>
     <string name="about_map_title">Mappa</string>
     <string name="about_map_body">Dati e tasselli della mappa:</string>
+    <string name="about_app_license_title">Licenza</string>
+    <string name="about_app_license_body">© 2026 filbeq. FuelUp è software libero: puoi ridistribuirlo e modificarlo secondo i termini della GNU General Public License, versione 3. È fornito senza alcuna garanzia.</string>
+    <string name="about_open_source_code">Codice sorgente e licenza</string>
+    <string name="about_open_notices">Licenze open source</string>
 
     <!-- Stato dei dati (mappa) -->
     <string name="status_loading">Download dei prezzi…</string>

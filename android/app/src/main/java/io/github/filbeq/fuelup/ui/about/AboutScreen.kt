@@ -32,6 +32,8 @@ import io.github.filbeq.fuelup.ui.readableWidth
 private const val DATASET_URL =
     "https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti"
 private const val LICENSE_URL = "https://www.dati.gov.it/content/italian-open-data-license-v20"
+private const val SOURCE_URL = "https://github.com/filbeq/FuelUp"
+private const val NOTICES_URL = "https://github.com/filbeq/FuelUp/blob/main/THIRD_PARTY_NOTICES.md"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +87,12 @@ fun AboutScreen(onBack: () -> Unit) {
             Section(R.string.about_map_title)
             Body(R.string.about_map_body)
             CurrentMapProvider.attributions.forEach { Link(stringResource(it.label), it.url) }
+
+            // The "appropriate legal notices" GPL-3.0 asks interactive programs to show.
+            Section(R.string.about_app_license_title)
+            Body(R.string.about_app_license_body)
+            Link(stringResource(R.string.about_open_source_code), SOURCE_URL)
+            Link(stringResource(R.string.about_open_notices), NOTICES_URL)
         }
     }
 }
