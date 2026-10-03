@@ -1,0 +1,38 @@
+name: Check published data
+
+# Fails (and GitHub emails the repository owner) when the published data is
+# behind: MIMIT has had newer prices for over 3 hours, or yesterday's prices are
+# not online by 14:00 Italian time. Rules in pipeline/fuel_pipeline/freshness.py.
+# Scheduled runs can be late or dropped too: four a day, so at least one runs.
+
+on:
+  schedule:
+    - cron: "40 10,13,16,19 * * *"
+  workflow_dispatch:
+    inputs:
+      published_date:
+        description: "Dry run: pretend the published data is from this date (YYYY-MM-DD). Empty = real check."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Compare the published data with MIMIT
+        env:
+          PUBLISHED_DATE: ${{ inputs.published_date }}
+        run: python -m fuel_pipeline.freshness check ${PUBLISHED_DATE:+--published-date "$PUBLISHED_DATE"}
