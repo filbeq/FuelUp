@@ -47,6 +47,7 @@
     <string name="price_not_available">Non disponibile</string>
     <string name="mode_self">Self</string>
     <string name="mode_served">Servito</string>
+    <string name="mode_not_applicable">Self e servito valgono solo per benzina e gasolio</string>
     <string name="station_fuel_column">Carburante</string>
     <string name="station_motorway">Autostrada</string>
     <string name="reported_today">Comunicato oggi</string>
@@ -65,6 +66,27 @@
     <string name="legend_average">Nella media</string>
     <string name="legend_expensive">Caro</string>
     <string name="legend_to_verify">Da verificare</string>
+    <string name="fuel_selector_action">cambiare carburante e vedere il significato dei colori</string>
+    <string name="fuel_panel_title">Carburante</string>
+    <string name="legend_title">Colori dei prezzi</string>
+    <string name="legend_not_compared">Non confrontato</string>
+    <plurals name="legend_cheap_detail">
+        <item quantity="one">Almeno %1$d cent sotto il prezzo tipico della zona</item>
+        <item quantity="many">Almeno %1$d cent sotto il prezzo tipico della zona</item>
+        <item quantity="other">Almeno %1$d cent sotto il prezzo tipico della zona</item>
+    </plurals>
+    <plurals name="legend_average_detail">
+        <item quantity="one">Entro %1$d cent dal prezzo tipico della zona</item>
+        <item quantity="many">Entro %1$d cent dal prezzo tipico della zona</item>
+        <item quantity="other">Entro %1$d cent dal prezzo tipico della zona</item>
+    </plurals>
+    <plurals name="legend_expensive_detail">
+        <item quantity="one">Almeno %1$d cent sopra il prezzo tipico della zona</item>
+        <item quantity="many">Almeno %1$d cent sopra il prezzo tipico della zona</item>
+        <item quantity="other">Almeno %1$d cent sopra il prezzo tipico della zona</item>
+    </plurals>
+    <string name="legend_to_verify_detail">Molto più basso del solito: verificalo alla pompa</string>
+    <string name="legend_not_compared_detail">Troppo pochi distributori vicini per un confronto</string>
     <string name="cluster_from_price">da %1$s</string>
 
     <!-- Scheda: carburante scelto e confronto -->

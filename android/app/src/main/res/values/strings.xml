@@ -53,6 +53,7 @@
     <string name="price_not_available">Not available</string>
     <string name="mode_self">Self</string>
     <string name="mode_served">Served</string>
+    <string name="mode_not_applicable">Self and served apply to petrol and diesel only</string>
     <string name="station_fuel_column">Fuel</string>
     <string name="station_motorway">Motorway</string>
     <string name="reported_today">Reported today</string>
@@ -71,6 +72,24 @@
     <string name="legend_average">Average</string>
     <string name="legend_expensive">Expensive</string>
     <string name="legend_to_verify">To verify</string>
+    <string name="fuel_selector_action">change fuel and see what the colours mean</string>
+    <string name="fuel_panel_title">Fuel</string>
+    <string name="legend_title">Price colours</string>
+    <string name="legend_not_compared">Not compared</string>
+    <plurals name="legend_cheap_detail">
+        <item quantity="one">At least %1$d cent below the typical local price</item>
+        <item quantity="other">At least %1$d cents below the typical local price</item>
+    </plurals>
+    <plurals name="legend_average_detail">
+        <item quantity="one">Within %1$d cent of the typical local price</item>
+        <item quantity="other">Within %1$d cents of the typical local price</item>
+    </plurals>
+    <plurals name="legend_expensive_detail">
+        <item quantity="one">At least %1$d cent above the typical local price</item>
+        <item quantity="other">At least %1$d cents above the typical local price</item>
+    </plurals>
+    <string name="legend_to_verify_detail">Far below the usual price: check it at the pump</string>
+    <string name="legend_not_compared_detail">Too few stations nearby to compare</string>
     <!-- Cluster label: cheapest price in the group; %1$s = price like "1.990" -->
     <string name="cluster_from_price">from %1$s</string>
 

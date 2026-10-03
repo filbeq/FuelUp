@@ -232,6 +232,12 @@ fun MapScreen(
     }
     val peekHeight = with(density) { (handleHeightPx + contentPeekPx + navBarPx).toDp() }
 
+    // The fuel choice panel (fuel, self/served, legend); kept open across rotation.
+    var fuelPanelOpen by rememberSaveable { mutableStateOf(false) }
+    if (fuelPanelOpen && !covered) {
+        FuelChoiceSheet(choice = state.choice, onChoiceChange = onChoiceChange, onDismiss = { fuelPanelOpen = false })
+    }
+
     // Where the sheet's top edge is, so the map credits can stay above it.
     var sheetTopPx by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     var mapBottomPx by remember { mutableFloatStateOf(0f) }
@@ -405,11 +411,16 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
-                Modifier.align(Alignment.TopCenter).onSizeChanged { topControlsPx = it.height },
+                Modifier.fillMaxWidth().align(Alignment.TopCenter).onSizeChanged { topControlsPx = it.height },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                FuelSelector(choice = state.choice, onChoiceChange = onChoiceChange)
                 DataStatusCard(state = state, onRetry = onRetry)
+                // On the right, like Google Maps' map-type button; always shows the current choice.
+                FuelChoiceButton(
+                    choice = state.choice,
+                    onClick = { fuelPanelOpen = true },
+                    modifier = Modifier.align(Alignment.End),
+                )
             }
             // Lift the credits and the button above the sheet so they're never covered.
             val aboveSheet = Modifier.offset { IntOffset(0, -(mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt()) }
