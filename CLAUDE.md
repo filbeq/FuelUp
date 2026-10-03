@@ -199,10 +199,15 @@ small enough to be tested on a real phone before moving on.
   stations by name/brand/address/municipality/province, and municipalities
   (`data/StationSearch.kt`, rules in DEVELOPMENT.md "Search"). Every typed
   word must start a word of the target; case/accents/apostrophes ignored;
-  "S." = San/Santo/Santa/Sant' (added on the data side only). Ranking:
-  ≤ 5 municipalities (exact, prefix, words; bigger first), then ≤ 50
-  stations (whole-word matches first, then name/brand prefix, name+brand,
-  anywhere; sellers of the chosen fuel first, then nearest to the map centre).
+  "S." = San/Santo/Santa/Sant' (added on the data side only). Ranking
+  (step 8.7): ≤ 5 municipalities (exact, prefix, words; bigger first) and
+  ≤ 50 stations (whole-word matches before prefix-only; then sellers of the
+  chosen fuel; then nearest to the user's position, else the map centre).
+  Municipalities come first only for a place: exact municipality name, or
+  more stations in the matching towns than carry a matching brand ("san",
+  "reggio": places; "eni", "api", "ip": brands, towns listed after the
+  stations). Rows show the distance when the position is known (whole km
+  from 10 km).
   Index: sorted vocabulary + word ids per station, built in the background
   once per download (~1 s, +5 MB); a keystroke costs 4–10 ms (≤ 70 ms for
   2 letters). UI: Material 3 `SearchBar` + `ExpandedFullScreenSearchBar`;
@@ -248,7 +253,8 @@ small enough to be tested on a real phone before moving on.
   as MIMIT writes them. 9 names in the data differ from ISTAT's spelling,
   listed in DEVELOPMENT.md; no hard-coded exceptions.
 - Station sheet: non-modal `BottomSheetScaffold` (map stays interactive);
-  collapsed = name + main prices, expanded = details. Back: expanded →
+  collapsed = name + main prices, with Navigate on the price's line (step
+  8.7), expanded = details. Back: expanded →
   collapsed → closed. "Navigate" uses a `geo:` intent (any navigation app,
   no Google dependency). Stations at identical coordinates link to each
   other in the collapsed sheet (their markers overlap).
@@ -288,6 +294,12 @@ small enough to be tested on a real phone before moving on.
 - Debug builds are arm64-only to keep installs small; release keeps all ABIs.
 - Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
   (system default unless chosen in Settings); no dynamic colour.
+- Floating surfaces (step 8.7): search bar, gear, date pill, fuel button,
+  bottom sheet and side panel share `floatingSurfaceColor()` (`ui/theme/Theme.kt`):
+  white (`surfaceContainerLowest`) in the light theme, `surfaceContainerHigh`
+  in the dark one; follows the app theme, never the map style. The search
+  field paints its own background (`inputFieldColors`). Sheet shadow 3 dp like
+  the side panel; small controls 2 dp.
 - Palette (step 6c): "Ink blue", Material 3 schemes generated from seed
   `#2F5DA8` (Google's Material colour algorithm; secondary/tertiary in the same
   blue family). Rule: **UI colours never green and never orange/red**, so they
@@ -356,6 +368,15 @@ small enough to be tested on a real phone before moving on.
     station names/addresses stay as provided by MIMIT
 - Language: the in-app setting works on every Android version (AppCompat);
   on Android 13+ it is the same setting as the system per-app language picker.
+- Launch (step 8.7): if the location permission is already granted, the app
+  opens on the user (never asks at launch): a last-known fix up to 10 min old
+  at once, else a fresh one (20 s); 5 km circle framed for that view only
+  (`radiusOverrideKm`, the saved radius stays for the button; a chip clears
+  it), list minimised to its header. Nothing shown while locating, failures
+  silent. After a last-known fix a fresh fix follows in the background: it
+  updates position, list and search distances, and re-frames only if it moved
+  > 500 m (`Nearby.movedEnough`) and the user hasn't moved the map. Once per
+  fresh start (not after rotation). Debug log: `launch fix` in FuelUpPerf.
 - "Near me" (step 7):
   - Permission: asked only when the my-location button (a regular-size FAB,
     bottom right of the map, lifted above the sheet) is tapped; foreground only, never
@@ -426,6 +447,11 @@ personal use on the test phone. Done in step 8 so far:
   checked on the phone (light/dark map, landscape, near-me distances, faked
   missing and re-registered favourites). Backup restore itself untested (needs
   a Play Store install or `bmgr`).
+- 8.7: Navigate in the collapsed sheet, launch on the user's position,
+  sheet shadow, one floating surface colour, brand searches by distance;
+  checked on the phone (light/dark, landscape, launch logs) and the tablet
+  emulator (no permission: no dialog at launch). The > 500 m re-frame path is
+  unit-tested only (on the phone the fresh fix matched the last-known one).
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 

@@ -325,6 +325,17 @@ build only (don't commit it).
 The my-location button (bottom right of the map) finds the user once and lists
 the stations around them that sell the chosen fuel.
 
+**At launch**, if the location permission is already granted (it is never
+asked at launch), the app opens on the user: a 5 km circle framed, the list
+lowered to its header. A last known position up to 10 minutes old is used at
+once; a fresh one is then asked for in the background and, when it arrives,
+updates the position, the list and the search distances. The map is framed
+again only if the fresh position is more than 500 m away and the map hasn't
+been moved meanwhile. The 5 km is for that view only: the saved radius comes
+back with the button. Nothing is shown while locating, and a failure (no
+position, location off) simply leaves the usual start. It happens once per
+start, not after a rotation. `adb logcat -s FuelUpPerf` shows `launch fix`.
+
 **Permission.** Asked only when the button is tapped, foreground only (never
 background). Approximate and precise are requested together: on Android 12+
 the user picks, and approximate is enough. Approximate alone was tried first,
@@ -403,6 +414,10 @@ the station details and the "near me" list move from the bottom sheet to a
 The map screen has no top bar: the map runs edge to edge, under the status
 bar. Settings and About keep their own top bar with Back.
 
+- **Surfaces:** everything floating over the map (search bar, gear, date
+  pill, fuel button, bottom sheet, side panel) has one background,
+  `floatingSurfaceColor()`: white in the light theme, a raised dark grey in the
+  dark one, whatever the map style. The sheet's shadow matches the side panel's.
 - **Top controls** (`ui/map/MapTopControls.kt`): the search bar (56 dp) with
   a round settings (gear) button beside it, the date pill and the fuel button
   (48 dp). Portrait: bar and gear on the first row, pill (left) and fuel button
@@ -460,13 +475,22 @@ V.LE / C.SO / P.ZA / P.ZZA / F.LLI as viale / corso / piazza / fratelli.
 Municipalities also match written without spaces ("santelpidio", "laquila");
 the province code is a word too ("san giuliano pi"). Fewer than 2 letters: no results.
 
-**Ranking.** Up to 5 municipalities first: exact name, then names starting with
-the text, then all words matching; bigger towns (more stations) first. Then up
-to 50 stations, in tiers: stations matching every word **in full** before
-those matching only the start of a longer word ("roma": stations in Rome
-before "ROMAIRONE"); within that, name or brand starting with the text, then
-all words in name + brand, then all words anywhere. Within a tier: stations
-selling the chosen fuel first, then nearest to the centre of the map.
+**Ranking.** Up to 5 municipalities: exact name, then names starting with the
+text, then all words matching; bigger towns (more stations) first. Up to 50
+stations: those matching every word **in full** before those matching only the
+start of a longer word ("roma": stations in Rome before "ROMAIRONE"); then
+stations selling the chosen fuel; then **nearest to the user** when the
+position is known (launch or "near me"), else to the centre of the map. Rows
+then show the distance (whole km from 10 km).
+
+**Place or brand?** Municipalities come first only when the query is a place:
+it is a municipality's exact name ("roma", "pisa", "apiro"), or more stations
+lie in the matching municipalities than carry a brand matching it. Otherwise
+the stations come first and the towns follow them. On the 2 Oct 2026 data:
+"eni" (Agip Eni, 3,919 stations; no town), "api" (Api-Ip, 3,686, against
+Apiro and Apice), "ip" (3,700, against Gazoldo degli Ippoliti) are brands;
+"san" (486 towns against 106 stations of two "San…" brands), "bar", "reggio"
+are places. Worked out from the data, so no list of brands in the code.
 
 **Speed.** Each word of the data is stored once in a sorted list, and each
 station keeps its words as numbers; the words starting with what was typed are
