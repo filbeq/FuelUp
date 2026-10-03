@@ -1,0 +1,124 @@
+name: Release
+
+# Builds the signed release APK and publishes it as a GitHub Release.
+# - Push a tag "vX.Y.Z" (X.Y.Z = appVersionName in android/app/build.gradle.kts,
+#   with release notes in release-notes/X.Y.Z.md) to publish a release.
+# - "Run workflow" in the Actions tab is a dry run: it builds and signs the APK
+#   and keeps it as a workflow artifact, without publishing anything.
+# Signing key: repository secrets, see DEVELOPMENT.md "Releases".
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the Release and upload its files
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign and publish the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the version and check the tag
+        run: |
+          version=$(sed -n 's/^val appVersionName = "\([^"]*\)".*/\1/p' android/app/build.gradle.kts)
+          if [ -z "$version" ]; then
+            echo "::error::appVersionName not found in android/app/build.gradle.kts"; exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match appVersionName $version (expected v$version)"; exit 1
+          fi
+          if [ ! -f "release-notes/$version.md" ]; then
+            echo "::error::Missing release notes: release-notes/$version.md"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Restore the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Signing secrets missing (RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS)"; exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Tests, lint and signed release build
+        working-directory: android
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: ./gradlew test lint assembleRelease --console=plain
+
+      - name: Check the signature and prepare the files
+        run: |
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)/apksigner
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::Signed APK not found (was the release build left unsigned?)"; exit 1
+          fi
+          "$apksigner" verify --print-certs "$apk" | tee certs.txt
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certs.txt)
+          mkdir dist
+          cp "$apk" "dist/FuelUp-$VERSION.apk"
+          cp android/app/build/outputs/mapping/release/mapping.txt "dist/mapping-$VERSION.txt"
+          sha=$(sha256sum "dist/FuelUp-$VERSION.apk" | cut -d ' ' -f 1)
+          {
+            cat "release-notes/$VERSION.md"
+            echo
+            echo "---"
+            echo
+            echo "**Install:** download \`FuelUp-$VERSION.apk\` below on your Android phone"
+            echo "(Android 8 or newer) and open it. See"
+            echo "[Install](https://github.com/$GITHUB_REPOSITORY#install) for allowing the install."
+            echo
+            echo "**Verify (optional):**"
+            echo
+            echo "- APK SHA-256: \`$sha\`"
+            echo "- Signing certificate SHA-256: \`$cert\`"
+            echo
+            echo "\`mapping-$VERSION.txt\` is for developers: it decodes crash reports."
+          } > notes.md
+          cat notes.md
+
+      - name: Publish the GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$VERSION" in 0.*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" "dist/FuelUp-$VERSION.apk" "dist/mapping-$VERSION.txt" \
+            --verify-tag --title "FuelUp $VERSION" --notes-file notes.md $prerelease
+
+      - name: Keep the APK (dry run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: FuelUp-${{ env.VERSION }}-dry-run
+          path: |
+            dist/
+            notes.md
+          retention-days: 7
+
+      - name: Delete the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
