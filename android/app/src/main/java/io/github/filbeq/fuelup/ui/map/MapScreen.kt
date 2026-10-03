@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -249,11 +250,25 @@ fun MapScreen(
         }
     }
 
-    // A new position: fit the search circle between the top controls and the sheet.
+    // A new position or radius: fit the search circle between the top controls and the sheet.
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
     val radiusKm = nearMe.settings.radiusKm
+    // The circle the camera last fitted, kept across rotation: a rebuilt screen
+    // must not move the camera back to it once the user has moved the map.
+    var fittedFix by rememberSaveable { mutableLongStateOf(0L) }
+    var fittedRadiusKm by rememberSaveable { mutableIntStateOf(0) }
+    // That fit used the measured list height (not the first estimate).
+    var fittedMeasured by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(nearMe.fixCount, radiusKm, nearbyCollapsedPx > 0) {
         val position = nearMe.position ?: return@LaunchedEffect
+        if (!nearMe.open) return@LaunchedEffect
+        val measured = nearbyCollapsedPx > 0
+        val sameCircle = nearMe.fixCount == fittedFix && radiusKm == fittedRadiusKm
+        // Same circle: only refine an estimated fit once the list is measured.
+        if (sameCircle && (fittedMeasured || !measured)) return@LaunchedEffect
+        fittedFix = nearMe.fixCount
+        fittedRadiusKm = radiusKm
+        fittedMeasured = measured
         cameraCommand = CameraCommand(
             id = (cameraCommand?.id ?: 0) + 1,
             move = CameraMove.FitCircle(

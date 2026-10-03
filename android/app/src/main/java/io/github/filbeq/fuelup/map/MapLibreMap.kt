@@ -1,6 +1,7 @@
 package io.github.filbeq.fuelup.map
 
 import android.content.res.Resources
+import android.graphics.PointF
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -129,9 +130,13 @@ fun MapLibreMap(
                     hit
                 }
                 map.addOnCameraIdleListener {
-                    val position = map.cameraPosition
-                    val target = position.target ?: return@addOnCameraIdleListener
-                    currentOnCameraIdle.value(MapCamera(target.latitude, target.longitude, position.zoom))
+                    if (width == 0 || height == 0) return@addOnCameraIdleListener
+                    // The place in the middle of the view, not the camera's target: after
+                    // fitting the "near me" circle the camera keeps padding (top controls,
+                    // sheet), so its target is off-centre, and a map rebuilt from it (e.g.
+                    // after rotation, without padding) would show a shifted view.
+                    val centre = map.projection.fromScreenLocation(PointF(width / 2f, height / 2f))
+                    currentOnCameraIdle.value(MapCamera(centre.latitude, centre.longitude, map.cameraPosition.zoom))
                 }
             }
         }
