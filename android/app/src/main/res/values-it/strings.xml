@@ -30,13 +30,17 @@
 
     <!-- Stato dei dati (mappa) -->
     <string name="status_loading">Download dei prezzi…</string>
-    <string name="status_prices_at">Prezzi di %1$s, ore %2$s</string>
-    <string name="status_prices_today">Prezzi di oggi, ore %1$s</string>
-    <string name="status_prices_yesterday">Prezzi di ieri, ore %1$s</string>
+    <string name="status_prices_at">Prezzi di %1$s</string>
+    <string name="status_prices_today">Prezzi di oggi</string>
+    <string name="status_prices_yesterday">Prezzi di ieri</string>
+    <!-- Lo stesso dentro una frase ("Aggiornato ai prezzi di ieri"). -->
+    <string name="prices_today_in_sentence">prezzi di oggi</string>
+    <string name="prices_yesterday_in_sentence">prezzi di ieri</string>
+    <string name="prices_of_in_sentence">prezzi di %1$s</string>
     <!-- Dati più vecchi di quelli che il MIMIT dovrebbe aver già pubblicato: neutro, non un errore. -->
     <string name="status_update_late">Aggiornamento in ritardo</string>
     <string name="prices_date_pattern">dd/MM</string>
-    <string name="prices_weekday_date_pattern">EEEE dd/MM</string>
+    <string name="prices_weekday_date_pattern">EEE dd/MM</string>
     <string name="prices_time_pattern">H:mm</string>
     <string name="status_offline">Offline: prezzi salvati</string>
     <string name="status_update_failed">Impossibile verificare nuovi prezzi</string>
@@ -132,8 +136,8 @@
     <string name="settings_last_checked">Ultimo controllo: %1$s</string>
     <string name="settings_never_checked">Non ancora controllati</string>
     <string name="settings_updating">Controllo dei nuovi prezzi…</string>
-    <string name="update_result_updated">Aggiornato ai prezzi del %1$s, ore %2$s</string>
-    <string name="update_result_up_to_date">Già aggiornato (prezzi del %1$s, ore %2$s)</string>
+    <string name="update_result_updated">Aggiornato ai %1$s</string>
+    <string name="update_result_up_to_date">Già aggiornato (%1$s)</string>
     <string name="update_result_offline">Nessuna connessione: riprova quando sei online</string>
     <string name="update_result_failed">Aggiornamento non riuscito: riprova più tardi</string>
     <string name="language_system">Predefinita di sistema</string>

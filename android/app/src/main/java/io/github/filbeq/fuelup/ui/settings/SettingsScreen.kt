@@ -52,7 +52,8 @@ import io.github.filbeq.fuelup.data.mapStyleForDark
 import io.github.filbeq.fuelup.data.themeForDark
 import io.github.filbeq.fuelup.data.themeForFollowSystem
 import io.github.filbeq.fuelup.ui.map.ManualUpdate
-import io.github.filbeq.fuelup.ui.map.formatPricesAt
+import io.github.filbeq.fuelup.ui.map.dataDateText
+import io.github.filbeq.fuelup.ui.map.rememberDataDateClock
 import io.github.filbeq.fuelup.ui.readableWidth
 import java.time.Instant
 import java.time.ZoneId
@@ -163,9 +164,9 @@ private fun UpdateNowRow(update: ManualUpdate, lastChecked: Instant?, currentPri
         ManualUpdate.Idle -> null
         ManualUpdate.Running -> stringResource(R.string.settings_updating) to false
         is ManualUpdate.Done -> when (val result = update.result) {
-            is RefreshResult.Updated -> pricesAtText(R.string.update_result_updated, result.snapshot.meta.pricesAt, locale) to false
+            is RefreshResult.Updated -> pricesAtText(R.string.update_result_updated, result.snapshot.meta.pricesAt) to false
             RefreshResult.UpToDate -> currentPricesAt?.let {
-                pricesAtText(R.string.update_result_up_to_date, it, locale) to false
+                pricesAtText(R.string.update_result_up_to_date, it) to false
             }
             RefreshResult.Offline -> stringResource(R.string.update_result_offline) to true
             RefreshResult.Failed -> stringResource(R.string.update_result_failed) to true
@@ -192,17 +193,10 @@ private fun UpdateNowRow(update: ManualUpdate, lastChecked: Instant?, currentPri
     )
 }
 
-/** "… prices of 02/10, 8:00" in the app language. */
+/** "Updated to yesterday's prices" / "… prices of Tuesday, Oct 6", as the date pill words it. */
 @Composable
-private fun pricesAtText(@StringRes text: Int, pricesAt: String, locale: Locale): String {
-    val (date, time) = formatPricesAt(
-        pricesAt,
-        stringResource(R.string.prices_date_pattern),
-        stringResource(R.string.prices_time_pattern),
-        locale,
-    )
-    return stringResource(text, date, time)
-}
+private fun pricesAtText(@StringRes text: Int, pricesAt: String): String =
+    stringResource(text, dataDateText(pricesAt, rememberDataDateClock(), inSentence = true))
 
 /** A whole-row switch; disabled rows are greyed and announced as disabled. */
 @Composable

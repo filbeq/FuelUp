@@ -7,38 +7,16 @@ import java.util.Locale
 
 class PricesAtFormatTest {
     @Test
-    fun italian() {
-        assertEquals(
-            "30/09" to "8:00",
-            formatPricesAt("2026-09-30T08:00:00+02:00", "dd/MM", "H:mm", Locale.ITALIAN),
-        )
-    }
-
-    @Test
-    fun english() {
-        val (date, time) = formatPricesAt("2026-09-30T08:00:00+02:00", "MMM d", "h:mm a", Locale.ENGLISH)
-        assertEquals("Sep 30", date)
-        assertEquals("8:00 AM", time.replace(' ', ' ')) // some JDKs use a narrow space before AM
-    }
-
-    @Test
-    fun alwaysShownInItalianTime() {
-        // Same instant written in UTC: still 8:00 in Italy.
-        assertEquals(
-            "30/09" to "8:00",
-            formatPricesAt("2026-09-30T06:00:00Z", "dd/MM", "H:mm", Locale.ITALIAN),
-        )
-    }
-
-    @Test
     fun weekdayAndDate() {
-        assertEquals("martedì 06/10", formatPricesAt("2026-10-06T08:00:00+02:00", "EEEE dd/MM", "H:mm", Locale.ITALIAN).first)
-        assertEquals("Tuesday, Oct 6", formatPricesAt("2026-10-06T08:00:00+02:00", "EEEE, MMM d", "h:mm a", Locale.ENGLISH).first)
+        // Short weekday: the pill must fit beside the widest fuel button ("Gasolio · Servito").
+        assertEquals("mar 06/10", formatPricesDate("2026-10-06T08:00:00+02:00", "EEE dd/MM", Locale.ITALIAN))
+        assertEquals("Tue, Oct 6", formatPricesDate("2026-10-06T08:00:00+02:00", "EEE, MMM d", Locale.ENGLISH))
     }
 
     @Test
-    fun dataDateIsTheItalianDay() {
+    fun alwaysTheItalianDay() {
         // 23:30 UTC on the 5th is already the 6th in Italy.
+        assertEquals("mar 06/10", formatPricesDate("2026-10-05T23:30:00Z", "EEE dd/MM", Locale.ITALIAN))
         assertEquals(LocalDate.of(2026, 10, 6), pricesAtDate("2026-10-05T23:30:00Z"))
         assertEquals(LocalDate.of(2026, 10, 6), pricesAtDate("2026-10-06T08:00:00+02:00"))
     }

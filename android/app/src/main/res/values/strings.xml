@@ -34,14 +34,18 @@
     <!-- Data status (map screen) -->
     <string name="status_loading">Downloading prices…</string>
     <!-- %1$s = date, %2$s = time, both in Italian time, e.g. "Sep 30", "8:00 AM" -->
-    <string name="status_prices_at">Prices of %1$s, %2$s</string>
-    <string name="status_prices_today">Today\'s prices, %1$s</string>
-    <string name="status_prices_yesterday">Yesterday\'s prices, %1$s</string>
+    <string name="status_prices_at">Prices of %1$s</string>
+    <string name="status_prices_today">Today\'s prices</string>
+    <string name="status_prices_yesterday">Yesterday\'s prices</string>
+    <!-- The same inside a sentence ("Updated to yesterday\'s prices"). -->
+    <string name="prices_today_in_sentence">today\'s prices</string>
+    <string name="prices_yesterday_in_sentence">yesterday\'s prices</string>
+    <string name="prices_of_in_sentence">prices of %1$s</string>
     <!-- Data older than the newest MIMIT should have published by now: neutral, not an error. -->
     <string name="status_update_late">Update delayed</string>
     <!-- java.time patterns for the date and time above -->
     <string name="prices_date_pattern">MMM d</string>
-    <string name="prices_weekday_date_pattern">EEEE, MMM d</string>
+    <string name="prices_weekday_date_pattern">EEE, MMM d</string>
     <string name="prices_time_pattern">h:mm a</string>
     <string name="status_offline">Offline: showing saved prices</string>
     <string name="status_update_failed">Couldn\'t check for new prices</string>
@@ -138,8 +142,8 @@
     <string name="settings_last_checked">Last checked: %1$s</string>
     <string name="settings_never_checked">Not checked yet</string>
     <string name="settings_updating">Checking for new prices…</string>
-    <string name="update_result_updated">Updated to prices of %1$s, %2$s</string>
-    <string name="update_result_up_to_date">Already up to date (prices of %1$s, %2$s)</string>
+    <string name="update_result_updated">Updated to %1$s</string>
+    <string name="update_result_up_to_date">Already up to date (%1$s)</string>
     <string name="update_result_offline">No connection: try again when you\'re online</string>
     <string name="update_result_failed">Update failed: try again later</string>
     <string name="language_system">System default</string>

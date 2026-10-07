@@ -382,13 +382,16 @@ small enough to be tested on a real phone before moving on.
 - Data: download the published JSON at most once a day, cache it on device,
   work offline from cache, show the data date and a clear error state.
   Data date label (step 8.10, issue #2, `data/DataDateLabel.kt`): Italian
-  time; "Prezzi di ieri, ore 8:00" for yesterday's data, else weekday + date
-  ("Prezzi di martedì 06/10"); never a warning for the newest possible data
+  time; "Prezzi di ieri" for yesterday's data, else short weekday + date
+  ("Prezzi di mar 06/10"; no time, always 08:00; short so the pill and the
+  widest fuel button "Gasolio · Servito" fit one portrait row at 100% font);
+  never a warning for the newest possible data
   (the day before yesterday until the morning publication); a neutral second
   line "Aggiornamento in ritardo" only when older than expected, with the
   freshness checker's 14:00 deadline. Re-evaluated at midnight, 14:00 and on
   resume. About explains MIMIT publishes the previous day's 08:00 prices each
-  morning. Settings' "Update data now" results keep the plain date.
+  morning. Settings' "Update data now" results use the same words
+  (`ui/map/DataDateText.kt`, "Già aggiornato (prezzi di ieri)").
   Decisions (step 4):
   - parsing: kotlinx.serialization, streamed from the cached file; prices as
     `List<LongArray>` (no boxing)

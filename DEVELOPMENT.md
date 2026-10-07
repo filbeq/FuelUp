@@ -190,6 +190,7 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/ui/map/MapViewModel.kt` | Loads the cache, then refreshes in the background |
 | `java/…/ui/map/DataStatusCard.kt` | Data date and loading / offline / error / update messages |
 | `java/…/data/DataDateLabel.kt` | How the data date reads ("yesterday", or weekday and date) and when it counts as late |
+| `java/…/ui/map/DataDateText.kt` | That wording in the app language (date pill, Settings) and the clock that updates it |
 | `java/…/data/StationData.kt` | Kotlin mirror of the published JSON (schema v1) + parser |
 | `java/…/data/StationRepository.kt` | Download, validation, file cache |
 | `java/…/data/RefreshPolicy.kt` | When to contact the server |
@@ -235,9 +236,14 @@ contact the server (`data/RefreshPolicy.kt`):
    update the app.
 
 **Data date label** (`data/DataDateLabel.kt`, the date pill). In Italian time:
-"Prezzi di ieri, ore 8:00" / "Yesterday's prices, 8:00 AM" when the data is
-yesterday's (the newest MIMIT publishes), else the weekday and date ("Prezzi di
-martedì 06/10, ore 8:00"). Between midnight and the morning publication the day
+"Prezzi di ieri" / "Yesterday's prices" when the data is yesterday's (the newest
+MIMIT publishes), else the short weekday and date ("Prezzi di mar 06/10" /
+"Prices of Tue, Oct 6"). No time: it is always 08:00, which About explains.
+Short weekday so that in portrait the pill and the widest fuel button
+("Gasolio · Servito", "Diesel · Served") stay on one row at 100% font (checked
+on the phone with a Wednesday, the longest; with the full weekday the fuel
+button dropped to its own row). "Update data now" in Settings uses the same
+words ("Già aggiornato (prezzi di ieri)", `ui/map/DataDateText.kt`). Between midnight and the morning publication the day
 before yesterday is still the newest, so it gets no warning. Only data older
 than what should exist by now adds a neutral second line, "Aggiornamento in
 ritardo" / "Update delayed": yesterday's prices from 14:00 Italian time (the
