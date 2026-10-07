@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.filbeq.fuelup.data.Geo
+import io.github.filbeq.fuelup.data.MapArea
 import io.github.filbeq.fuelup.data.UserPosition
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -41,6 +42,9 @@ data class MapCamera(val latitude: Double, val longitude: Double, val zoom: Doub
         )
     }
 }
+
+/** Pixels of the map covered at each edge (controls, sheet, side panel): the rest is the free area. */
+data class AreaInsets(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
 /**
  * A one-off camera move asked for by the screen. [id] tells two identical
@@ -126,7 +130,7 @@ fun MapLibreMap(
     onStationClick: (Int) -> Unit,
     /** A tap that hit no station and no cluster. */
     onMapTapEmpty: () -> Unit,
-    /** The user started moving the map (drag, pinch), as opposed to the app. */
+    /** The user started moving the map (drag, pinch, a tap on a cluster), as opposed to the app. */
     onUserMovedCamera: () -> Unit,
     /** The map's rotation (degrees clockwise from north, 0–360) and tilt (degrees), on every camera frame. */
     onBearingTilt: (bearing: Float, tilt: Float) -> Unit,
@@ -137,6 +141,10 @@ fun MapLibreMap(
     /** Colours (ARGB) of the user's position and the search circle, see [UserLocationLayers]. */
     locationColor: Int,
     locationHalo: Int,
+    /** What covers the map's edges, for [onAreaIdle]. */
+    areaInsets: AreaInsets,
+    /** The free part of the map (inside [areaInsets]) whenever the camera stops. */
+    onAreaIdle: (MapArea) -> Unit,
     /** Latest camera move asked for, or null. */
     cameraCommand: CameraCommand?,
     modifier: Modifier = Modifier,
@@ -149,6 +157,8 @@ fun MapLibreMap(
     val currentOnMapTapEmpty = rememberUpdatedState(onMapTapEmpty)
     val currentOnUserMovedCamera = rememberUpdatedState(onUserMovedCamera)
     val currentOnBearingTilt = rememberUpdatedState(onBearingTilt)
+    val currentAreaInsets = rememberUpdatedState(areaInsets)
+    val currentOnAreaIdle = rememberUpdatedState(onAreaIdle)
     val currentLocationColor = rememberUpdatedState(locationColor)
     val currentLocationHalo = rememberUpdatedState(locationHalo)
     // The style currently on screen, once fully loaded (null while loading).
@@ -172,10 +182,16 @@ fun MapLibreMap(
                 map.addOnMapClickListener { latLng ->
                     val style = map.style?.takeIf { it.isFullyLoaded } ?: return@addOnMapClickListener false
                     val point = map.projection.toScreenLocation(latLng)
+                    var station = false
                     val hit = StationLayers.handleTap(map, style, point, resources.displayMetrics.density) {
+                        station = true
                         currentOnStationClick.value(it)
                     }
-                    if (!hit) currentOnMapTapEmpty.value()
+                    when {
+                        !hit -> currentOnMapTapEmpty.value()
+                        // A cluster tap zooms in: the user moved the map, as with a gesture.
+                        !station -> currentOnUserMovedCamera.value()
+                    }
                     hit
                 }
                 map.addOnCameraMoveStartedListener { reason ->
@@ -193,6 +209,7 @@ fun MapLibreMap(
                     // after rotation, without padding) would show a shifted view.
                     val centre = map.projection.fromScreenLocation(PointF(width / 2f, height / 2f))
                     currentOnCameraIdle.value(MapCamera(centre.latitude, centre.longitude, map.cameraPosition.zoom))
+                    currentOnAreaIdle.value(freeArea(map, width, height, currentAreaInsets.value))
                 }
             }
         }
@@ -264,6 +281,21 @@ fun MapLibreMap(
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
+}
+
+/** The corners of the map inside [insets] (the whole map if they leave nothing), clockwise from the top left. */
+private fun freeArea(map: MapLibreMap, width: Int, height: Int, insets: AreaInsets): MapArea {
+    val fits = insets.left + insets.right < width && insets.top + insets.bottom < height
+    val left = if (fits) insets.left.toFloat() else 0f
+    val top = if (fits) insets.top.toFloat() else 0f
+    val right = if (fits) (width - insets.right).toFloat() else width.toFloat()
+    val bottom = if (fits) (height - insets.bottom).toFloat() else height.toFloat()
+    return MapArea(
+        listOf(PointF(left, top), PointF(right, top), PointF(right, bottom), PointF(left, bottom)).map {
+            val latLng = map.projection.fromScreenLocation(it)
+            doubleArrayOf(latLng.latitude, latLng.longitude)
+        },
+    )
 }
 
 private fun moveCamera(map: MapLibreMap, move: CameraMove) {

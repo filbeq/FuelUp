@@ -84,12 +84,15 @@ import io.github.filbeq.fuelup.PerfLog
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.FavoriteStation
 import io.github.filbeq.fuelup.data.FuelChoice
+import io.github.filbeq.fuelup.data.MapArea
 import io.github.filbeq.fuelup.data.MapStyleMode
 import io.github.filbeq.fuelup.data.Municipality
 import io.github.filbeq.fuelup.data.Nearby
 import io.github.filbeq.fuelup.data.NearbySort
+import io.github.filbeq.fuelup.data.PlaceNames
 import io.github.filbeq.fuelup.data.SearchResults
 import io.github.filbeq.fuelup.data.isDark
+import io.github.filbeq.fuelup.map.AreaInsets
 import io.github.filbeq.fuelup.map.CameraCommand
 import io.github.filbeq.fuelup.map.CameraMove
 import io.github.filbeq.fuelup.map.CurrentMapProvider
@@ -114,6 +117,7 @@ import io.github.filbeq.fuelup.ui.theme.LocationHaloLight
 import io.github.filbeq.fuelup.ui.theme.floatingSurfaceColor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -196,13 +200,35 @@ fun MapScreen(
     // Where the station's details are scrolled to; back at the top for another station.
     val stationScroll = rememberSaveable(shownDetails?.id, saver = ScrollState.Saver) { ScrollState(0) }
 
-    // The sheet shows the selected station, else the "near me" panel; with neither, it hides.
-    val sheetWanted = selectedStationId != null || nearMe.open
-    // Which of the two it shows, kept while it slides away (else closing "near
+    // The area list: the stations in a part of the map (after a municipality
+    // search, or "Search this area"). Exclusive with "near me". Saved: which part
+    // of the map it lists (its corners) and the municipality it was opened for.
+    var areaOpen by rememberSaveable { mutableStateOf(false) }
+    var listedAreaCorners by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
+    val listedArea = remember(listedAreaCorners) { listedAreaCorners?.let(MapArea::fromArray) }
+    var areaTown by rememberSaveable { mutableStateOf<String?>(null) }
+    var areaProvince by rememberSaveable { mutableStateOf<String?>(null) }
+    // The user moved the map since the list was made: "Search this area" shows.
+    var areaMoved by rememberSaveable { mutableStateOf(false) }
+    // The free part of the map when the camera last stopped.
+    var latestArea by remember { mutableStateOf<MapArea?>(null) }
+    // A municipality from the search, waiting for the camera to frame it.
+    var pendingTown by remember { mutableStateOf<Municipality?>(null) }
+
+    // The sheet shows the selected station, else the "near me" or area list; with none, it hides.
+    val sheetWanted = selectedStationId != null || nearMe.open || areaOpen
+    // Which one it shows, kept while it slides away (else closing "near
     // me" after visiting a station would show that station on the way out).
     var shownContent by remember { mutableStateOf(SheetContent.None) }
-    if (sheetWanted) shownContent = if (selectedStationId != null) SheetContent.Station else SheetContent.NearMe
-    val listShown = selectedStationId == null && nearMe.open && nearMe.status == NearMeStatus.Located && state.snapshot != null
+    if (sheetWanted) {
+        shownContent = when {
+            selectedStationId != null -> SheetContent.Station
+            areaOpen -> SheetContent.Area
+            else -> SheetContent.NearMe
+        }
+    }
+    val listShown = selectedStationId == null && state.snapshot != null &&
+        (areaOpen || (nearMe.open && nearMe.status == NearMeStatus.Located))
     // An empty-map tap lowers the list to its header ("minimised"); the title,
     // a drag up or the my-location button bring it back. Kept across a station visit.
     var nearbyMinimised by rememberSaveable { mutableStateOf(false) }
@@ -250,6 +276,8 @@ fun MapScreen(
             if (value == SheetValue.Hidden && previous != SheetValue.Hidden) {
                 currentOnDismiss()
                 currentOnCloseNearMe()
+                areaOpen = false
+                areaMoved = false
                 nearbyMinimised = false
             }
             // Dragged all the way up: the list is back in full.
@@ -298,7 +326,12 @@ fun MapScreen(
         if (selectedStationId != null) {
             leaveStation()
         } else {
-            onCloseNearMe()
+            if (areaOpen) {
+                areaOpen = false
+                areaMoved = false
+            } else {
+                onCloseNearMe()
+            }
             nearbyMinimised = false
         }
     }
@@ -411,12 +444,37 @@ fun MapScreen(
         }
     }
 
+    // The area list: recomputed when the area, position, order, fuel or data change.
+    // Distances from the user when known, else from the middle of the area.
+    val areaStations = remember(listedArea, nearMe.position, nearMe.settings.sort, state.ranking, state.snapshot) {
+        val area = listedArea
+        val snapshot = state.snapshot
+        if (area == null || snapshot == null || area.tooLarge) {
+            emptyList()
+        } else {
+            val position = nearMe.position
+            Nearby.inArea(
+                snapshot.stations.stations,
+                state.ranking,
+                area,
+                position?.lat ?: area.centreLat,
+                position?.lon ?: area.centreLon,
+                nearMe.settings.sort,
+            )
+        }
+    }
+
     // A new position or radius: fit the search circle between the top controls and the sheet
     // (or beside the side panel).
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
     val radiusKm = nearMe.radiusKm
     // Opened by the app at launch: just the list's header, the map in view.
-    LaunchedEffect(nearMe.openedAtLaunch) { if (nearMe.openedAtLaunch) nearbyMinimised = true }
+    // Unless the user opened an area list before the position came: that stays
+    // (the position is kept, for the distances).
+    LaunchedEffect(nearMe.openedAtLaunch) {
+        if (!nearMe.openedAtLaunch) return@LaunchedEffect
+        if (areaOpen) onCloseNearMe() else nearbyMinimised = true
+    }
     // The map's rotation and tilt, updated on every camera frame; the compass shows while either isn't zero.
     var bearing by remember { mutableFloatStateOf(0f) }
     var tilt by remember { mutableFloatStateOf(0f) }
@@ -431,7 +489,7 @@ fun MapScreen(
     var fittedMeasured by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(nearMe.fixCount, radiusKm, nearbyCollapsedPx > 0, wide) {
         val position = nearMe.position ?: return@LaunchedEffect
-        if (!nearMe.open) return@LaunchedEffect
+        if (!nearMe.open || areaOpen) return@LaunchedEffect
         // The side panel's width is known at once.
         val measured = wide || nearbyCollapsedPx > 0
         val sameCircle = nearMe.fixCount == fittedFix && radiusKm == fittedRadiusKm
@@ -472,6 +530,13 @@ fun MapScreen(
         withFrameNanos { }
     }
     val freeBottomPx = { if (wide) 0 else (mapBottomPx - sheetTopPx).coerceAtLeast(0f).roundToInt() }
+    // What a collapsed list covers at the bottom of the map (measured, else estimated):
+    // the area list lists the map above it, so its first rows never hide a listed station.
+    val listBottomPx = when {
+        wide -> 0
+        nearbyCollapsedPx > 0 -> handleHeightPx + nearbyCollapsedPx + navBarPx
+        else -> (mapHeightPx * SHEET_SHARE).roundToInt()
+    }
     val moveCamera = { move: CameraMove -> cameraCommand = CameraCommand(id = (cameraCommand?.id ?: 0) + 1, move = move) }
 
     // A station from the "near me" list or the search: selected as by a tap,
@@ -491,24 +556,56 @@ fun MapScreen(
         missingSpot = lat to lon
         scope.launch {
             awaitSheetSettled()
-            moveCamera(CameraMove.Show(lat, lon, minZoom = STATION_ZOOM, topPx = topControlsPx, bottomPx = freeBottomPx(), leftPx = if (nearMe.open) panelCoverPx else 0))
+            moveCamera(CameraMove.Show(lat, lon, minZoom = STATION_ZOOM, topPx = topControlsPx, bottomPx = freeBottomPx(), leftPx = if (nearMe.open || areaOpen) panelCoverPx else 0))
         }
     }
-    // A municipality from the search: like a tap on empty map (leave the station,
-    // lower the "near me" list), then frame all its stations.
+    // The area list for [area] (from a municipality search when [town] is given):
+    // replaces "near me", first rows in view.
+    val showArea = { area: MapArea, town: Municipality? ->
+        if (nearMe.open) onCloseNearMe()
+        missingSpot = null
+        listedAreaCorners = area.toArray()
+        areaTown = town?.name
+        areaProvince = town?.province
+        areaOpen = true
+        areaMoved = false
+        nearbyMinimised = false
+        scope.launch { nearbyListState.scrollToItem(0) }
+    }
+    // Every time the camera stops: a municipality just framed gets its list;
+    // a list that said "zoom in" fills in once the area is small enough.
+    val onAreaIdle = { area: MapArea ->
+        latestArea = area
+        val town = pendingTown
+        when {
+            town != null -> {
+                pendingTown = null
+                showArea(area, town)
+            }
+            areaOpen && listedArea?.tooLarge == true && !area.tooLarge -> showArea(area, null)
+        }
+    }
+    // A municipality from the search: leave the station, frame all its stations
+    // above where the list will be, then list the stations in that frame
+    // (nearby towns' too) once the camera stops.
     val openMunicipality = { municipality: Municipality ->
-        onMapTapEmpty()
+        missingSpot = null
+        if (selectedStationId != null) leaveStation()
         scope.launch {
             awaitSheetSettled()
+            pendingTown = municipality
             moveCamera(
                 CameraMove.FitPoints(
                     municipality.mainStations().map { doubleArrayOf(it.lat, it.lon) },
                     maxZoom = STATION_ZOOM + 1,
                     topPx = topControlsPx,
-                    bottomPx = freeBottomPx(),
-                    leftPx = if (nearMe.open) panelCoverPx else 0,
+                    bottomPx = listBottomPx,
+                    leftPx = panelCoverPx,
                 ),
             )
+            // No camera stop (the frame was already on screen): list what's in view.
+            delay(AREA_FIT_TIMEOUT_MS)
+            if (pendingTown === municipality) latestArea?.let { onAreaIdle(it) }
         }
     }
 
@@ -562,11 +659,16 @@ fun MapScreen(
                 closeButton = closeButton,
             )
             StationSheetBody(station, state.choice, stationScroll)
-        } else if (shownContent == SheetContent.NearMe && nearMe.status == NearMeStatus.Located && state.snapshot != null) {
+        } else if (
+            state.snapshot != null &&
+            (shownContent == SheetContent.Area || (shownContent == SheetContent.NearMe && nearMe.status == NearMeStatus.Located))
+        ) {
+            val area = shownContent == SheetContent.Area
+            val town = areaTown
             NearbyList(
                 state = nearMe,
                 choice = state.choice,
-                stations = nearby,
+                stations = if (area) areaStations else nearby,
                 brands = state.snapshot.stations.brands,
                 listState = nearbyListState,
                 minimised = nearbyMinimised,
@@ -581,6 +683,15 @@ fun MapScreen(
                 // The minimised side panel is just the header (the sheet hides the rows by its height).
                 showRows = !(wide && nearbyMinimised),
                 closeButton = closeButton,
+                area = if (!area) {
+                    null
+                } else {
+                    AreaListInfo(
+                        place = town?.let { stringResource(R.string.place_with_province, PlaceNames.municipality(it), areaProvince.orEmpty()) },
+                        tooLarge = listedArea?.tooLarge == true,
+                        fromCentre = nearMe.position == null,
+                    )
+                },
             )
         } else if (shownContent == SheetContent.NearMe) {
             NearMeStatusPanel(
@@ -638,17 +749,24 @@ fun MapScreen(
                     }
                 },
                 onMapTapEmpty = onMapTapEmpty,
-                onUserMovedCamera = { userMovedMap = true },
+                onUserMovedCamera = {
+                    userMovedMap = true
+                    // A list is open: offer the stations now in view.
+                    if (areaOpen || (nearMe.open && nearMe.status == NearMeStatus.Located)) areaMoved = true
+                },
                 onBearingTilt = { b, t ->
                     bearing = b
                     tilt = t
                 },
-                // Shown only while "near me" is open: closing it clears the map.
-                userPosition = nearMe.position.takeIf { nearMe.open },
+                // Shown only while "near me" (or the area list, whose distances are from it) is open.
+                userPosition = nearMe.position.takeIf { nearMe.open || areaOpen },
                 searchRadiusKm = radiusKm.toDouble().takeIf { nearMe.open },
                 // Like the clusters, by the map's darkness (the app theme may differ).
                 locationColor = (if (mapIsDark) LocationColorDark else LocationColorLight).toArgb(),
                 locationHalo = (if (mapIsDark) LocationHaloDark else LocationHaloLight).toArgb(),
+                // The free part of the map, above a collapsed list and beside the side panel.
+                areaInsets = AreaInsets(left = panelCoverPx, top = topControlsPx, right = 0, bottom = listBottomPx),
+                onAreaIdle = onAreaIdle,
                 cameraCommand = cameraCommand,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -698,6 +816,8 @@ fun MapScreen(
                 onClick = {
                     nearbyMinimised = false
                     missingSpot = null
+                    areaOpen = false
+                    areaMoved = false
                     onOpenNearMe()
                     requestLocation()
                 },
@@ -721,6 +841,19 @@ fun MapScreen(
                     .padding(end = 16.dp + (56.dp - COMPASS_SIZE) / 2, bottom = 40.dp + 56.dp + 12.dp),
             ) {
                 CompassButton(bearing = { bearing }, onClick = { moveCamera(CameraMove.ResetNorth) })
+            }
+            // "Search this area" after the user moved the map with a list open: above
+            // the list, level with the my-location button; centred in the free map.
+            AnimatedVisibility(
+                visible = areaMoved && listShown && latestArea != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .then(if (wide) Modifier.offset { IntOffset(panelShownPx / 2, 0) } else aboveSheet)
+                    .padding(bottom = 40.dp + (56.dp - SEARCH_AREA_BUTTON_HEIGHT) / 2),
+            ) {
+                SearchAreaButton(onClick = { latestArea?.let { showArea(it, null) } })
             }
             if (wide) {
                 SidePanel(
@@ -801,7 +934,7 @@ private fun MapAttributionBar(onClick: () -> Unit, modifier: Modifier = Modifier
 }
 
 /** What the sheet (or side panel) shows; None until something is opened. */
-private enum class SheetContent { None, Station, NearMe }
+private enum class SheetContent { None, Station, NearMe, Area }
 
 private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -816,6 +949,12 @@ private const val TURNED_DEGREES = 0.5f
 
 /** Longest wait for the sheet to stop moving before a camera move. */
 private const val SHEET_SETTLE_TIMEOUT_MS = 1_500L
+
+/** Longest wait for the camera to stop on a searched municipality before listing what's in view. */
+private const val AREA_FIT_TIMEOUT_MS = 2_000L
+
+/** Height of [SearchAreaButton], to line it up with the my-location button. */
+private val SEARCH_AREA_BUTTON_HEIGHT = 40.dp
 
 /** Share of the map's height the sheet is assumed to cover before the list is measured. */
 private const val SHEET_SHARE = 0.4f

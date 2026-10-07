@@ -218,10 +218,11 @@ small enough to be tested on a real phone before moving on.
   the dropdown fitted one result above the keyboard on a landscape phone). Portrait: bar +
   gear, then date pill (left) + fuel button (right). Wide: one row, bar
   360 dp aligned with the side panel, which opens under it; gear, pill
-  centred in the rest, fuel button at the right. A municipality result acts
-  like an empty-map tap and frames its stations (`CameraMove.FitPoints`),
+  centred in the rest, fuel button at the right. A municipality result leaves
+  a selected station and frames its stations (`CameraMove.FitPoints`),
   leaving out misfiled ones (> 5× median distance from the median point and
-  > 10 km; towns with < 3 stations keep all: `Municipality.mainStations`); a
+  > 10 km; towns with < 3 stations keep all: `Municipality.mainStations`)
+  and opens the area list on that frame (see "Area list"); a
   station result selects it and shows it (`CameraMove.Show`, after the sheet
   settles). A selected station without a marker (doesn't sell the chosen
   fuel) gets a hollow dot inside the ring (own one-point source).
@@ -229,6 +230,21 @@ small enough to be tested on a real phone before moving on.
   The ~25 stations dropped for misplaced coordinates are not searchable
   (owner's choice for now; adding them = new optional `unlocated` key, no
   schema bump, fixture regenerated).
+- Area list (step 8.9, issue #1): the near-me list (`NearbyList` + an
+  `AreaListInfo`) for a part of the map (`data/MapArea.kt`: four corners of
+  the free area above a collapsed list / beside the panel, Mercator
+  point-in-quad). Opened by a municipality search ("Around Pisa (PI)": nearby
+  towns' stations in the frame are listed, so never just the town's name) or
+  "Search this area" ("In this area"). Never changes live: a user move (drag,
+  pinch, cluster tap) with a list open (area, or near me located, also
+  minimised) shows the button above the list, level with the FAB (wide: centred
+  in the free map). Limit: area's longer side ≤ 80 km (`MAX_SIDE_KM`), a size
+  not a zoom (Rome frames at z8.8; tablets); larger → "zoom in to see prices",
+  fills in by itself once small enough. Header: no radius chips, sort switch on
+  its own line; "distances from the centre of the area" when no position and
+  Distance order. Rows: municipality + distance when known. Exclusive with near
+  me; FAB switches back; the launch fix doesn't replace an open area list.
+  Measurements and test tips in DEVELOPMENT.md "Area list".
 - Favourites (step 8.6): star (`IconToggleButton`, outline/filled, ink blue,
   never yellow) after the station name in the sheet/panel. Listed when the
   search opens with an empty query, above the hint (`ui/map/FavoritesList.kt`),
@@ -456,7 +472,7 @@ small enough to be tested on a real phone before moving on.
   (`StationLayers.fromPrice`).
 - No analytics, no tracking, no personal data collected.
 
-## Status (2026-10-03)
+## Status (2026-10-07)
 
 Steps 1–7 are done, committed and pushed; CI green. The app is in daily
 personal use on the test phone. Done in step 8 so far:
@@ -485,6 +501,10 @@ personal use on the test phone. Done in step 8 so far:
   unit-tested only (on the phone the fresh fix matched the last-known one).
 - 8.8: own compass button (see "Compass"); checked on the phone in portrait
   and landscape.
+- 8.9 (issue #1): area list, see "Area list"; checked on the phone (town
+  search, Search this area, near me → area, fuel change, row → Back, landscape
+  panel, dark; "zoom in" + auto-fill with a temporary 10 km limit, adb can't
+  pinch). User-visible changes go in `release-notes/0.2.0.md`.
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 

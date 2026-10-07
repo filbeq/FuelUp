@@ -207,7 +207,9 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/data/Nearby.kt` | "Near me" list: stations within a radius, sorted; saved radius/sort |
 | `java/…/ui/map/NearMeViewModel.kt` | "Near me" state: permission answers, position, radius/sort |
 | `java/…/ui/map/NearMePanel.kt` | Sheet messages while locating, or why there is no position |
-| `java/…/ui/map/NearbyList.kt` | The "near me" list in the sheet |
+| `java/…/ui/map/NearbyList.kt` | The "near me" list in the sheet, also used for the area list |
+| `java/…/data/MapArea.kt` | The part of the map the area list covers; its size limit |
+| `java/…/ui/map/SearchAreaButton.kt` | "Search this area" over the map |
 | `java/…/map/UserLocationLayers.kt` | Accuracy disc and search circle on the map |
 | `java/…/ui/about/AboutScreen.kt` | Data source, notices, map credits |
 | `java/…/ui/theme/` | Fixed FuelUp light/dark palette |
@@ -384,6 +386,57 @@ chosen fuel); Back returns to the list. Tapping empty map leaves the selected
 station, or else lowers the list to its header (title, sort, radius) so the
 circle on the map stays explained. Back: station → list → collapsed → closed.
 
+### Area list
+
+The sheet (or side panel) can also list the stations **in a part of the map**
+instead of around the user: "Around Pisa (PI)" after a municipality search,
+"In this area" after **Search this area**. It is the near-me list
+(`NearbyList`) with another header: title, fuel and number of stations, the
+same Price/Distance switch, no radius chips. Rows show the municipality, plus
+the distance when the user's position is known (from launch or "near me");
+without a position the Distance order counts from the middle of the area, and
+the header says so. Same behaviour as near me: collapsed = header + 2 rows,
+empty-map tap lowers it to its header, rotation and the side panel keep it, a
+new fuel choice or new data updates it. Back: station → list → closed. The
+my-location button switches back to near me; the user's position stays drawn
+(no circle).
+
+**Which area** (`data/MapArea.kt`): the free part of the map when the camera
+stops — below the top controls, above a collapsed list (its measured height,
+else 40% of the map), beside the side panel. Kept as four corners, so a
+rotated map works; a station is in it if it is inside them (in Web Mercator,
+where the screen's edges are straight lines).
+
+- **Municipality search:** the town's stations are framed above where the list
+  will be, then the list shows that frame once the camera stops (so nearby
+  towns' stations in the frame are listed; misfiled ones left out of the frame
+  are not). The title says "Around …", never just the town.
+- **Search this area:** the list never changes while the map moves. After the
+  user drags, pinches or taps a cluster with a list open (the area list, or
+  "near me" with a position, also minimised), a button appears above the list,
+  level with the my-location button (wide windows: centred in the free map);
+  tapping it lists the area now in view. The app's own camera moves (opening a
+  station from the list) don't show it.
+- **Size limit: 80 km** (the area's longer side). Larger: "Zoom in to see
+  prices", nothing listed; once the user zooms in enough the list fills in by
+  itself. A size, not a zoom level: a tablet shows 2–4× more ground than a phone
+  at the same zoom, and the largest towns are framed below zoom 10 (on a phone:
+  Rome 8.8, its stations spanning 48 km; Naples 9.4, Genoa 9.6; 26 towns in
+  all). Every town's frame fits (Rome ≈ 70 km). Measured on 6 Oct 2026
+  (petrol self, a portrait phone's free area, centred on 300 random stations):
+
+  | Zoom | Area | Stations: 10th pct / median / 90th pct |
+  |---|---|---|
+  | 8 | 89 × 100 km | 255 / 586 / 1,347 (too large) |
+  | 9 | 45 × 50 km | 63 / 174 / 728 |
+  | 10 | 22 × 25 km | 17 / 60 / 296 |
+  | 11 | 11 × 12 km | 5 / 23 / 101 |
+  | 12 | 6 × 6 km | 2 / 8 / 36 |
+
+**Testing:** adb can't pinch, so zooming out to region scale can't be scripted.
+For the "zoom in" path, temporarily set `MAX_SIDE_KM` to 10 (don't commit it),
+search a town (its frame is over 10 km), then tap clusters to zoom in.
+
 ### Wide screens (landscape, tablets)
 
 When the window is at least **600 dp wide** (Material's "medium" width class:
@@ -514,7 +567,8 @@ once per download; each keystroke cancels the previous search.
 
 **Results.** A municipality shows its number of stations and the cheapest
 usable price of the chosen fuel (as a cluster's "from" price: no prices to
-verify, no Livigno); tapping it frames its stations. Stations filed under the
+verify, no Livigno); tapping it frames its stations and opens the area list on
+that frame (see *Area list*). Stations filed under the
 wrong municipality (one "PISA" station is in Capannoli, 26 km away) would zoom
 the map out, so the frame leaves out those more than **5× the median distance**
 from the municipality's median point **and more than 10 km** away

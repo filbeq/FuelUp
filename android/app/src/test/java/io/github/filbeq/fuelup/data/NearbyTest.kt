@@ -52,6 +52,21 @@ class NearbyTest {
         assertEquals(1.112, first.distanceKm, 0.01)
     }
 
+    // From (44.995, 8.99) to (45.06, 9.01): stations 1–3 and 6 (which doesn't sell the fuel).
+    private val area = MapArea(
+        listOf(doubleArrayOf(45.06, 8.99), doubleArrayOf(45.06, 9.01), doubleArrayOf(44.995, 9.01), doubleArrayOf(44.995, 8.99)),
+    )
+
+    @Test
+    fun areaListsTheStationsInsideThatSellTheFuel() {
+        val byPrice = Nearby.inArea(stations, ranking, area, 45.0, 9.0, NearbySort.PRICE)
+        assertEquals(listOf(2, 1, 3), byPrice.map { it.station.id })
+        // Distances from the given point (the user, or the area's middle).
+        val fromFar = Nearby.inArea(stations, ranking, area, 45.1, 9.0, NearbySort.DISTANCE)
+        assertEquals(listOf(3, 2, 1), fromFar.map { it.station.id })
+        assertEquals(5.56, fromFar.first().distanceKm, 0.01)
+    }
+
     @Test
     fun aFreshFixReframesOnlyWhenItMovedMoreThan500m() {
         val old = UserPosition(45.0, 9.0, 1500f)

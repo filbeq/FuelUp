@@ -150,6 +150,18 @@
     <string name="action_widen_radius">Cerca entro %1$d km</string>
     <string name="class_not_compared">Non confrontato</string>
     <string name="action_show_list">Mostra l\'elenco</string>
+    <!-- Elenco della zona: i distributori nella parte visibile della mappa. -->
+    <string name="area_title">In questa zona</string>
+    <string name="area_title_around">Intorno a %1$s</string>
+    <plurals name="area_subtitle">
+        <item quantity="one">%1$s · %2$d distributore</item>
+        <item quantity="many">%1$s · %2$d distributori</item>
+        <item quantity="other">%1$s · %2$d distributori</item>
+    </plurals>
+    <string name="area_from_centre">Distanze dal centro della zona</string>
+    <string name="area_empty">Nessun distributore in questa zona vende %1$s.</string>
+    <string name="area_zoom_in">Avvicina la mappa per vedere i prezzi</string>
+    <string name="action_search_area">Cerca in questa zona</string>
 
     <!-- Ricerca -->
     <string name="search_hint">Cerca distributori o comuni</string>

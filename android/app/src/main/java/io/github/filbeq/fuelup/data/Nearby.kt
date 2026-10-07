@@ -6,7 +6,7 @@ import kotlin.math.cos
 
 enum class NearbySort { PRICE, DISTANCE }
 
-/** A station in the "near me" list: its price for the chosen fuel and how far it is. */
+/** A station in the "near me" or area list: its price for the chosen fuel and how far it is. */
 class NearbyStation(val station: Station, val price: RankedPrice, val distanceKm: Double)
 
 /** The "cheapest nearby" list. Distances are as the crow flies (no roads). */
@@ -25,11 +25,7 @@ object Nearby {
     fun movedEnough(old: UserPosition, new: UserPosition): Boolean =
         Geo.distanceKm(old.lat, old.lon, new.lat, new.lon) > REFRAME_KM
 
-    /**
-     * Stations within [radiusKm] of a point that sell the chosen fuel (those in
-     * [ranking]). By price: cheapest first, ties by distance, prices "to verify"
-     * last (a suspect price is never on top). By distance: nearest first, ties by price.
-     */
+    /** Stations within [radiusKm] of a point that sell the chosen fuel (those in [ranking]), sorted by [sort]. */
     fun find(
         stations: List<Station>,
         ranking: Map<Int, RankedPrice>,
@@ -47,14 +43,41 @@ object Nearby {
             val distance = Geo.distanceKm(lat, lon, station.lat, station.lon)
             if (distance > radiusKm) null else NearbyStation(station, price, distance)
         }
-        return when (sort) {
-            NearbySort.PRICE -> found.sortedWith(
-                compareBy<NearbyStation> { it.price.priceClass == PriceClass.TO_VERIFY }
-                    .thenBy { it.price.priceMilli }
-                    .thenBy { it.distanceKm },
-            )
-            NearbySort.DISTANCE -> found.sortedWith(compareBy<NearbyStation> { it.distanceKm }.thenBy { it.price.priceMilli })
+        return sorted(found, sort)
+    }
+
+    /**
+     * Stations inside [area] that sell the chosen fuel (those in [ranking]),
+     * with their distance from a point: the user when the position is known,
+     * else the middle of the area. Sorted as [find].
+     */
+    fun inArea(
+        stations: List<Station>,
+        ranking: Map<Int, RankedPrice>,
+        area: MapArea,
+        fromLat: Double,
+        fromLon: Double,
+        sort: NearbySort,
+    ): List<NearbyStation> {
+        val found = stations.mapNotNull { station ->
+            val price = ranking[station.id] ?: return@mapNotNull null
+            if (!area.contains(station.lat, station.lon)) return@mapNotNull null
+            NearbyStation(station, price, Geo.distanceKm(fromLat, fromLon, station.lat, station.lon))
         }
+        return sorted(found, sort)
+    }
+
+    /**
+     * By price: cheapest first, ties by distance, prices "to verify" last (a
+     * suspect price is never on top). By distance: nearest first, ties by price.
+     */
+    private fun sorted(found: List<NearbyStation>, sort: NearbySort): List<NearbyStation> = when (sort) {
+        NearbySort.PRICE -> found.sortedWith(
+            compareBy<NearbyStation> { it.price.priceClass == PriceClass.TO_VERIFY }
+                .thenBy { it.price.priceMilli }
+                .thenBy { it.distanceKm },
+        )
+        NearbySort.DISTANCE -> found.sortedWith(compareBy<NearbyStation> { it.distanceKm }.thenBy { it.price.priceMilli })
     }
 
     private const val KM_PER_DEG_LAT = 111.0

@@ -159,6 +159,17 @@
     <string name="action_widen_radius">Search within %1$d km</string>
     <string name="class_not_compared">Not compared</string>
     <string name="action_show_list">Show the list</string>
+    <!-- Area list: the stations in the visible part of the map. -->
+    <string name="area_title">In this area</string>
+    <string name="area_title_around">Around %1$s</string>
+    <plurals name="area_subtitle">
+        <item quantity="one">%1$s · %2$d station</item>
+        <item quantity="other">%1$s · %2$d stations</item>
+    </plurals>
+    <string name="area_from_centre">Distances from the centre of the area</string>
+    <string name="area_empty">No station in this area sells %1$s.</string>
+    <string name="area_zoom_in">Zoom in to see prices</string>
+    <string name="action_search_area">Search this area</string>
 
     <!-- Search -->
     <string name="search_hint">Search stations or towns</string>

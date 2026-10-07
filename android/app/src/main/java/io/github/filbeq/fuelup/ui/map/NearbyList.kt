@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -72,9 +73,21 @@ import kotlin.math.roundToInt
 private const val PEEK_ROWS = 2
 
 /**
+ * The area list's own texts (see [NearbyList]): [place] is "Pisa (PI)" after a
+ * municipality search, else null ("In this area"). [tooLarge]: nothing listed,
+ * "zoom in". [fromCentre]: the user's position is unknown, so distances (for
+ * the Distance order) are from the middle of the area.
+ */
+class AreaListInfo(val place: String?, val tooLarge: Boolean, val fromCentre: Boolean)
+
+/**
  * "Near you": the stations within the chosen radius that sell [choice],
  * cheapest (or nearest) first. Only the header (title, order, radius) is
  * fixed; every row is in one scrolling list ([listState]).
+ *
+ * With [area], the same list for the stations in an area of the map instead:
+ * its own title and subtitle, no radius chips, and rows showing the
+ * municipality (plus the distance when the position is known).
  *
  * Heights are reported through [onMeasured] for the sheet: the header alone
  * (the minimised sheet: title, order, radius) and header + first [PEEK_ROWS]
@@ -99,6 +112,7 @@ fun NearbyList(
     modifier: Modifier = Modifier,
     showRows: Boolean = true,
     closeButton: (@Composable () -> Unit)? = null,
+    area: AreaListInfo? = null,
 ) {
     val now = remember(stations) { Instant.now() }
     val locale = LocalConfiguration.current.locales[0]
@@ -131,7 +145,9 @@ fun NearbyList(
             }
             // Title, then the order switch on the right; radius chips below.
             // In the narrower side panel the close button takes the right, and
-            // the order switch gets a line of its own.
+            // the order switch gets a line of its own; so does it under an area
+            // list's longer title ("Around Reggio nell'Emilia (RE)"), which has no chips.
+            val switchBeside = closeButton == null && area == null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val showList = stringResource(R.string.action_show_list)
                 Column(
@@ -139,23 +155,36 @@ fun NearbyList(
                         .weight(1f)
                         .then(if (minimised) Modifier.clickable(onClickLabel = showList, onClick = onExpand) else Modifier),
                 ) {
-                    Text(
-                        stringResource(R.string.near_me_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    state.position?.let {
+                    val title = when {
+                        area == null -> stringResource(R.string.near_me_title)
+                        area.place != null -> stringResource(R.string.area_title_around, area.place)
+                        else -> stringResource(R.string.area_title)
+                    }
+                    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                    val subtitle = when {
+                        area == null -> state.position?.let {
+                            stringResource(R.string.near_me_subtitle, choiceLabel(choice), formatAccuracy(it.accuracyMeters, locale))
+                        }
+                        area.tooLarge -> choiceLabel(choice)
+                        else -> pluralStringResource(R.plurals.area_subtitle, stations.size, choiceLabel(choice), stations.size)
+                    }
+                    subtitle?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    // The Distance order without a position: say where distances are from.
+                    if (area != null && !area.tooLarge && area.fromCentre && settings.sort == NearbySort.DISTANCE) {
                         Text(
-                            stringResource(R.string.near_me_subtitle, choiceLabel(choice), formatAccuracy(it.accuracyMeters, locale)),
+                            stringResource(R.string.area_from_centre),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-                if (closeButton == null) sortSwitch(Modifier.padding(start = 8.dp)) else closeButton()
+                if (switchBeside) sortSwitch(Modifier.padding(start = 8.dp)) else closeButton?.invoke()
             }
-            if (closeButton != null) sortSwitch(Modifier.padding(top = 8.dp))
-            Row(
+            if (!switchBeside) sortSwitch(Modifier.padding(top = 8.dp))
+            if (area == null) {
+                Row(
                 Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -167,8 +196,15 @@ fun NearbyList(
                         label = { Text(stringResource(R.string.radius_km, km)) },
                     )
                 }
+                }
             }
-            if (stations.isEmpty()) {
+            if (area != null && stations.isEmpty()) {
+                Text(
+                    if (area.tooLarge) stringResource(R.string.area_zoom_in) else stringResource(R.string.area_empty, choiceLabel(choice)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else if (stations.isEmpty()) {
                 Text(
                     stringResource(R.string.nearby_empty, state.radiusKm, choiceLabel(choice)),
                     style = MaterialTheme.typography.bodyMedium,
@@ -185,7 +221,20 @@ fun NearbyList(
             LazyColumn(Modifier.padding(horizontal = 16.dp).navigationBarsPadding(), state = listState) {
                 itemsIndexed(stations, key = { _, item -> item.station.id }) { index, item ->
                     val measure = if (index < PEEK_ROWS) Modifier.onSizeChanged { rowPx[index] = it.height } else Modifier
-                    NearbyRow(item, choice, brands, approximate, now, onStationClick, measure)
+                    if (area == null) {
+                        NearbyRow(item, choice, brands, approximate, now, onStationClick, measure)
+                    } else {
+                        StationRow(
+                            station = item.station,
+                            brand = brands.getOrElse(item.station.brand) { "" },
+                            price = item.price,
+                            choice = choice,
+                            where = placeAndDistance(item.station.municipality, item.station.province, item.station.lat, item.station.lon, state.position),
+                            now = now,
+                            onClick = { onStationClick(item) },
+                            modifier = measure,
+                        )
+                    }
                 }
             }
         }
