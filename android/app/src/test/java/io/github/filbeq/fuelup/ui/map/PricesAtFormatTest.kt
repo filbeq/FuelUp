@@ -2,6 +2,7 @@ package io.github.filbeq.fuelup.ui.map
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
 import java.util.Locale
 
 class PricesAtFormatTest {
@@ -27,5 +28,18 @@ class PricesAtFormatTest {
             "30/09" to "8:00",
             formatPricesAt("2026-09-30T06:00:00Z", "dd/MM", "H:mm", Locale.ITALIAN),
         )
+    }
+
+    @Test
+    fun weekdayAndDate() {
+        assertEquals("martedì 06/10", formatPricesAt("2026-10-06T08:00:00+02:00", "EEEE dd/MM", "H:mm", Locale.ITALIAN).first)
+        assertEquals("Tuesday, Oct 6", formatPricesAt("2026-10-06T08:00:00+02:00", "EEEE, MMM d", "h:mm a", Locale.ENGLISH).first)
+    }
+
+    @Test
+    fun dataDateIsTheItalianDay() {
+        // 23:30 UTC on the 5th is already the 6th in Italy.
+        assertEquals(LocalDate.of(2026, 10, 6), pricesAtDate("2026-10-05T23:30:00Z"))
+        assertEquals(LocalDate.of(2026, 10, 6), pricesAtDate("2026-10-06T08:00:00+02:00"))
     }
 }

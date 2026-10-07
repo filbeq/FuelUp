@@ -189,6 +189,7 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/map/MapProvider.kt` | Map style URLs and credits: change `CurrentMapProvider` to switch provider |
 | `java/…/ui/map/MapViewModel.kt` | Loads the cache, then refreshes in the background |
 | `java/…/ui/map/DataStatusCard.kt` | Data date and loading / offline / error / update messages |
+| `java/…/data/DataDateLabel.kt` | How the data date reads ("yesterday", or weekday and date) and when it counts as late |
 | `java/…/data/StationData.kt` | Kotlin mirror of the published JSON (schema v1) + parser |
 | `java/…/data/StationRepository.kt` | Download, validation, file cache |
 | `java/…/data/RefreshPolicy.kt` | When to contact the server |
@@ -232,6 +233,20 @@ contact the server (`data/RefreshPolicy.kt`):
    then replace the cache (`files/data/` in the app's private storage).
 5. A `schemaVersion` the app doesn't know → keep the cache and ask the user to
    update the app.
+
+**Data date label** (`data/DataDateLabel.kt`, the date pill). In Italian time:
+"Prezzi di ieri, ore 8:00" / "Yesterday's prices, 8:00 AM" when the data is
+yesterday's (the newest MIMIT publishes), else the weekday and date ("Prezzi di
+martedì 06/10, ore 8:00"). Between midnight and the morning publication the day
+before yesterday is still the newest, so it gets no warning. Only data older
+than what should exist by now adds a neutral second line, "Aggiornamento in
+ritardo" / "Update delayed": yesterday's prices from 14:00 Italian time (the
+staleness alarm's deadline, `pipeline/fuel_pipeline/freshness.py`), the day
+before's until then. The pill re-reads the clock at midnight, at 14:00 and when
+the app comes back to the front. Unit tests cover midnight, the deadline and
+both clock changes. About says that MIMIT publishes each morning the prices in
+force at 08:00 on the previous day. To see the other states on a phone, shift
+`Instant.now()` in `DataStatusCard.kt` for a test build (don't commit it).
 
 **Update data now** (Settings → Data) skips rules 2 and 3: it always fetches
 `meta.json`, then follows rules 4 and 5, and shows the outcome (updated / already

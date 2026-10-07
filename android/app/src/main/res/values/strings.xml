@@ -18,7 +18,7 @@
     <string name="about_unofficial_title">Unofficial app</string>
     <string name="about_unofficial_body">FuelUp is an independent project. It is not an official app and is not affiliated with or endorsed by the Italian Ministry of Enterprises and Made in Italy (MIMIT).</string>
     <string name="about_prices_title">About the prices</string>
-    <string name="about_prices_body">Prices are those in force at 08:00 on the data date shown in the app, as reported by the stations to the Ministry. They are not real time: always check the price at the pump.</string>
+    <string name="about_prices_body">Prices are those in force at 08:00 on the data date shown in the app, as reported by the stations to the Ministry. Each morning the Ministry publishes the prices in force at 08:00 on the previous day. They are not real time: always check the price at the pump.</string>
     <string name="about_data_title">Price data</string>
     <string name="about_data_source">Data source: Ministry of Enterprises and Made in Italy — Osservaprezzi Carburanti</string>
     <string name="about_data_license">Released under the Italian Open Data License 2.0 (IODL 2.0).</string>
@@ -35,8 +35,13 @@
     <string name="status_loading">Downloading prices…</string>
     <!-- %1$s = date, %2$s = time, both in Italian time, e.g. "Sep 30", "8:00 AM" -->
     <string name="status_prices_at">Prices of %1$s, %2$s</string>
+    <string name="status_prices_today">Today\'s prices, %1$s</string>
+    <string name="status_prices_yesterday">Yesterday\'s prices, %1$s</string>
+    <!-- Data older than the newest MIMIT should have published by now: neutral, not an error. -->
+    <string name="status_update_late">Update delayed</string>
     <!-- java.time patterns for the date and time above -->
     <string name="prices_date_pattern">MMM d</string>
+    <string name="prices_weekday_date_pattern">EEEE, MMM d</string>
     <string name="prices_time_pattern">h:mm a</string>
     <string name="status_offline">Offline: showing saved prices</string>
     <string name="status_update_failed">Couldn\'t check for new prices</string>

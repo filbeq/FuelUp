@@ -15,7 +15,7 @@
     <string name="about_unofficial_title">App non ufficiale</string>
     <string name="about_unofficial_body">FuelUp è un progetto indipendente. Non è un\'app ufficiale e non è affiliata né approvata dal Ministero delle Imprese e del Made in Italy (MIMIT).</string>
     <string name="about_prices_title">Informazioni sui prezzi</string>
-    <string name="about_prices_body">I prezzi sono quelli in vigore alle 8:00 della data indicata nell\'app, come comunicati dai gestori al Ministero. Non sono in tempo reale: verifica sempre il prezzo alla pompa.</string>
+    <string name="about_prices_body">I prezzi sono quelli in vigore alle 8:00 della data indicata nell\'app, come comunicati dai gestori al Ministero. Ogni mattina il Ministero pubblica i prezzi in vigore alle 8:00 del giorno prima. Non sono in tempo reale: verifica sempre il prezzo alla pompa.</string>
     <string name="about_data_title">Dati sui prezzi</string>
     <string name="about_data_source">Fonte dati: Ministero delle Imprese e del Made in Italy — Osservaprezzi Carburanti</string>
     <string name="about_data_license">Dati rilasciati con licenza Italian Open Data License 2.0 (IODL 2.0).</string>
@@ -30,8 +30,13 @@
 
     <!-- Stato dei dati (mappa) -->
     <string name="status_loading">Download dei prezzi…</string>
-    <string name="status_prices_at">Prezzi del %1$s, ore %2$s</string>
+    <string name="status_prices_at">Prezzi di %1$s, ore %2$s</string>
+    <string name="status_prices_today">Prezzi di oggi, ore %1$s</string>
+    <string name="status_prices_yesterday">Prezzi di ieri, ore %1$s</string>
+    <!-- Dati più vecchi di quelli che il MIMIT dovrebbe aver già pubblicato: neutro, non un errore. -->
+    <string name="status_update_late">Aggiornamento in ritardo</string>
     <string name="prices_date_pattern">dd/MM</string>
+    <string name="prices_weekday_date_pattern">EEEE dd/MM</string>
     <string name="prices_time_pattern">H:mm</string>
     <string name="status_offline">Offline: prezzi salvati</string>
     <string name="status_update_failed">Impossibile verificare nuovi prezzi</string>

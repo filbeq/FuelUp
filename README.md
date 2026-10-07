@@ -46,7 +46,8 @@ not update this one.
 ## About the prices
 
 Prices are those **in force at 08:00 on the data date** shown in the app, as
-reported by the stations to the Ministry. The data is updated once a day and is
+reported by the stations to the Ministry, which publishes each morning the
+prices in force at 08:00 on the previous day. The data is updated once a day and is
 **not real time**: always check the price at the pump.
 
 ## Privacy

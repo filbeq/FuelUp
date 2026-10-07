@@ -381,6 +381,14 @@ small enough to be tested on a real phone before moving on.
 - No API keys or secrets are needed by the app.
 - Data: download the published JSON at most once a day, cache it on device,
   work offline from cache, show the data date and a clear error state.
+  Data date label (step 8.10, issue #2, `data/DataDateLabel.kt`): Italian
+  time; "Prezzi di ieri, ore 8:00" for yesterday's data, else weekday + date
+  ("Prezzi di martedì 06/10"); never a warning for the newest possible data
+  (the day before yesterday until the morning publication); a neutral second
+  line "Aggiornamento in ritardo" only when older than expected, with the
+  freshness checker's 14:00 deadline. Re-evaluated at midnight, 14:00 and on
+  resume. About explains MIMIT publishes the previous day's 08:00 prices each
+  morning. Settings' "Update data now" results keep the plain date.
   Decisions (step 4):
   - parsing: kotlinx.serialization, streamed from the cached file; prices as
     `List<LongArray>` (no boxing)
@@ -472,7 +480,7 @@ small enough to be tested on a real phone before moving on.
   (`StationLayers.fromPrice`).
 - No analytics, no tracking, no personal data collected.
 
-## Status (2026-10-07)
+## Status (2026-10-08)
 
 Steps 1–7 are done, committed and pushed; CI green. The app is in daily
 personal use on the test phone. Done in step 8 so far:
@@ -505,6 +513,8 @@ personal use on the test phone. Done in step 8 so far:
   search, Search this area, near me → area, fuel change, row → Back, landscape
   panel, dark; "zoom in" + auto-fill with a temporary 10 km limit, adb can't
   pinch). User-visible changes go in `release-notes/0.2.0.md`.
+- 8.10 (issue #2): data date label, see "Data" above; checked on the phone
+  (after midnight, and "ieri" / late with a shifted test clock; About).
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
   alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
 

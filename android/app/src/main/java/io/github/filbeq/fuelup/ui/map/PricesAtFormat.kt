@@ -1,6 +1,7 @@
 package io.github.filbeq.fuelup.ui.map
 
 import io.github.filbeq.fuelup.data.RefreshPolicy
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -14,3 +15,6 @@ fun formatPricesAt(pricesAt: String, datePattern: String, timePattern: String, l
     return DateTimeFormatter.ofPattern(datePattern, locale).format(time) to
         DateTimeFormatter.ofPattern(timePattern, locale).format(time)
 }
+
+/** The data date of meta.json's `pricesAt`: the day in Italy at that instant. */
+fun pricesAtDate(pricesAt: String): LocalDate = OffsetDateTime.parse(pricesAt).atZoneSameInstant(RefreshPolicy.ITALY).toLocalDate()
