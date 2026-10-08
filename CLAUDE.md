@@ -535,7 +535,8 @@ owner's 0.1.0 on the phone: an update (firstInstallTime kept), no crash;
 fuel choice, theme, near-me radius/sort and cached prices kept (checked on
 screen; the release app had no favourites, so their survival is untested).
 Same day GitHub dropped every scheduled publish run after 00:58 UTC: the app
-rightly showed "Aggiornamento in ritardo" at 14:28; fixed by a manual run.
+rightly showed "Aggiornamento in ritardo" at 14:28; needs a manual run of
+"Publish fuel data" (Actions tab).
 
 Next: the rest of step 8 (see the backlog below).
 
