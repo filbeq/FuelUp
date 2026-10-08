@@ -526,7 +526,13 @@ workflow, licence, README done; release build tested on the phone on
 2026-10-03 (checklist in DEVELOPMENT.md passed, no crash; R8 needed no keep
 rules; compass untested, adb can't rotate the map). Found and fixed on the
 way: black search results in the dark theme, library pseudo-locale texts.
-Pending: workflow dry run (needs the owner's secrets) and the v0.1.0 tag.
+v0.1.0 published on 2026-10-03 by the release workflow.
+
+Release 0.2.0 (2026-10-08): area list (8.9) and data date label (8.10);
+tag `v0.2.0`, GitHub pre-release by the workflow, signed with the same
+certificate as 0.1.0 (`a518a687…`). Installed with `adb install -r` over the
+owner's 0.1.0 on the phone: an update (firstInstallTime kept), starts without
+a crash.
 
 Next: the rest of step 8 (see the backlog below).
 
