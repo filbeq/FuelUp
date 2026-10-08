@@ -30,7 +30,7 @@ fun signingValue(envName: String, propertyName: String): String? =
 
 val releaseStoreFile = signingValue("RELEASE_KEYSTORE_FILE", "storeFile")
 
-val appVersionName = "0.1.0" // bump for every release, see DEVELOPMENT.md "Releases"
+val appVersionName = "0.2.0" // bump for every release, see DEVELOPMENT.md "Releases"
 
 plugins {
     alias(libs.plugins.android.application)
