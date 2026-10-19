@@ -589,10 +589,9 @@ Next: the rest of step 8 (see the backlog below).
   centre), not fixed coordinates: layouts move (sheets, panels). Check the app is
   in front before every step; a reinstall closes it. Screenshots show the
   owner's area: keep them local, don't publish them.
-- `gh` is not installed: watch CI through the GitHub REST API
-  (`/repos/filbeq/FuelUp/actions/runs?head_sha=…`, run jobs/steps under
-  `/actions/runs/<id>/jobs`). Without a token, workflows can't be started from
-  here: the owner clicks "Run workflow" in the Actions tab.
+- `gh` is installed and logged in as filbeq (scopes `repo`, `workflow`):
+  start workflows (`gh workflow run`), watch them (`gh run watch`) and read
+  full logs (`gh run view --log`) from here.
 - App settings live in `shared_prefs/settings.xml`; edit them for tests with
   `adb shell "run-as io.github.filbeq.fuelup.debug sed -i '…' shared_prefs/settings.xml"`
   (quote the whole command, or the device shell treats `<` as a redirect).
