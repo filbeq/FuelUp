@@ -37,10 +37,12 @@ jobs:
           check() {
             name=$1; shift
             echo "::group::$name"
+            # "|| status=$?": the step runs with bash -e, which would stop at
+            # the first failed curl.
+            status=0
             result=$(curl -v -o /dev/null --connect-timeout 30 --max-time 120 \
               -w "http %{http_code}, ip %{remote_ip}, connect %{time_connect}s, tls %{time_appconnect}s, total %{time_total}s, %{size_download} bytes" \
-              "$@" 2>curl.err)
-            status=$?
+              "$@" 2>curl.err) || status=$?
             cat curl.err
             echo "::endgroup::"
             echo "$name: curl exit $status, $result"
