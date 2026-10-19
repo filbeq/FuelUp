@@ -1,0 +1,52 @@
+name: Diagnose MIMIT access
+
+# Manual only. Can a GitHub runner reach MIMIT? Since 16 Oct 2026 every
+# download from a runner has timed out, while it works from home. This shows
+# the runner's public address and a verbose connection attempt to the two
+# MIMIT files and to another .gov.it site. Every check runs even if one
+# fails; a one-line result per check is also written as an annotation.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Runner public address
+        run: |
+          v4=$(curl -4 -s --max-time 10 https://api.ipify.org || echo none)
+          v6=$(curl -6 -s --max-time 10 https://api6.ipify.org || echo none)
+          echo "IPv4: $v4"
+          echo "IPv6: $v6"
+          echo "::notice title=Runner address::IPv4 $v4, IPv6 $v6"
+
+      - name: DNS
+        run: |
+          getent ahosts www.mimit.gov.it || true
+          getent ahosts www.governo.it || true
+
+      # -v shows how far each connection gets (TCP, TLS, HTTP); the body is
+      # discarded. 30 s limit for the connection, 120 s in all.
+      - name: Connections
+        run: |
+          check() {
+            name=$1; shift
+            echo "::group::$name"
+            result=$(curl -v -o /dev/null --connect-timeout 30 --max-time 120 \
+              -w "http %{http_code}, ip %{remote_ip}, connect %{time_connect}s, tls %{time_appconnect}s, total %{time_total}s, %{size_download} bytes" \
+              "$@" 2>curl.err)
+            status=$?
+            cat curl.err
+            echo "::endgroup::"
+            echo "$name: curl exit $status, $result"
+            echo "::notice title=$name::curl exit $status, $result"
+          }
+          check "MIMIT prices" https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv
+          check "MIMIT stations" https://www.mimit.gov.it/images/exportCSV/anagrafica_impianti_attivi.csv
+          check "MIMIT port 80" -I http://www.mimit.gov.it/
+          check "Other gov.it" -I https://www.governo.it/
