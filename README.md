@@ -4,7 +4,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/filbeq/FuelUp?include_prereleases&label=release)](https://github.com/filbeq/FuelUp/releases)
 [![CI](https://github.com/filbeq/FuelUp/actions/workflows/ci.yml/badge.svg)](https://github.com/filbeq/FuelUp/actions/workflows/ci.yml)
-[![Published data](https://github.com/filbeq/FuelUp/actions/workflows/check-data.yml/badge.svg)](https://github.com/filbeq/FuelUp/actions/workflows/check-data.yml)
+[![Published data](https://github.com/filbeq/FuelUp/actions/workflows/publish-data.yml/badge.svg?event=schedule)](https://github.com/filbeq/FuelUp/actions/workflows/publish-data.yml)
 [![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue)](LICENSE)
 
 FuelUp is a free Android app that shows the prices of every fuel station in

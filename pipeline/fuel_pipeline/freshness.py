@@ -5,7 +5,8 @@ late, or drop them):
 
     python -m fuel_pipeline.freshness needs-publish
         "check" job: does MIMIT have a newer date than the published data?
-        Writes needed=true/false and stale=true/false to $GITHUB_OUTPUT.
+        Writes needed=true/false, stale=true/false and published=<date> to
+        $GITHUB_OUTPUT.
         MIMIT unreachable (it has answered only Italian IPs since 16 Oct
         2026): not needed, with a warning. Any other doubt (published data
         unreadable, MIMIT answering without a date): publish, the build
@@ -191,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             with open(output, "a", encoding="utf-8") as out:
                 out.write(f"needed={'true' if needed else 'false'}\n")
                 out.write(f"stale={'true' if is_stale else 'false'}\n")
+                out.write(f"published={published or ''}\n")
         return 0
 
     now = args.now.astimezone(UTC) if args.now else datetime.now(UTC)
