@@ -464,6 +464,20 @@ fun MapScreen(
         }
     }
 
+    // A user choice re-orders or replaces the list (order, radius, fuel/mode, a
+    // new area): show its new first rows. The rows are keyed by station, so the
+    // list would otherwise keep the old first visible station in view (issue #3).
+    // Saved, so a rotation keeps the scroll; a station visit or a new position
+    // changes nothing here, so Back finds the list as it was.
+    val listChoices = "${nearMe.settings.sort} ${nearMe.radiusKm} ${state.choice} ${listedAreaCorners?.contentToString()}"
+    var listedChoices by rememberSaveable { mutableStateOf(listChoices) }
+    LaunchedEffect(listChoices) {
+        if (listChoices != listedChoices) {
+            listedChoices = listChoices
+            nearbyListState.scrollToItem(0)
+        }
+    }
+
     // A new position or radius: fit the search circle between the top controls and the sheet
     // (or beside the side panel).
     var cameraCommand by remember { mutableStateOf<CameraCommand?>(null) }
