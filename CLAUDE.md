@@ -540,6 +540,17 @@ rightly showed "Aggiornamento in ritardo" at 14:28; needs a manual run of
 
 Next: the rest of step 8 (see the backlog below).
 
+### Issue #4 status (2026-10-22, in progress)
+
+MIMIT answers only Italian IPs since 16 Oct 2026, so GitHub can't publish.
+Plan steps 0–4 are done: cleaning ported to `android/core` (identical to the
+Python pipeline on 182 archive days), `android/cli`, and the app downloads
+MIMIT directly with the Pages copy as fallback and shows the source in Settings.
+Steps 5–7 are left (workflows on the CLI + remove the Python cleaning, alarm, docs),
+plus the open checks. Full plan, decisions, measurements and what's left:
+https://github.com/filbeq/FuelUp/issues/4#issuecomment-6351286850
+Until step 7, the sections above still describe the Python pipeline.
+
 ### Open issues (known, not yet fixed)
 
 - "Refused once, the system will ask again" permission path is untested on a
