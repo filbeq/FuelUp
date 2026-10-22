@@ -198,12 +198,12 @@ class StationRepository(
             val stationsBytes = timed("download MIMIT stations") { download(mimitStationsUrl, stationsTmp) }
             trace("MIMIT files: $pricesBytes + $stationsBytes bytes", 0)
             val meta = timed("clean MIMIT data") {
-                val stations = stationsTmp.inputStream().useMimitLines(::parseStations)
-                val prices = pricesTmp.inputStream().useMimitLines(::parsePrices)
-                val document = build(stations, prices, thresholds).document
+                val stations = timed("  parse stations CSV") { stationsTmp.inputStream().useMimitLines(::parseStations) }
+                val prices = timed("  parse prices CSV") { pricesTmp.inputStream().useMimitLines(::parsePrices) }
+                val document = timed("  join") { build(stations, prices, thresholds).document }
                 trace("heap after cleaning: ${usedHeapMb()} MB", 0)
                 outTmp.deleteRecursively()
-                writeOutput(document, outTmp)
+                timed("  write JSON") { writeOutput(document, outTmp) }
             }
             pricesTmp.delete()
             stationsTmp.delete()

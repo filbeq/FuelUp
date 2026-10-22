@@ -2,8 +2,6 @@ package io.github.filbeq.fuelup.core
 
 import java.io.File
 import java.io.OutputStream
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -261,6 +259,11 @@ internal fun jsonString(s: String): String = buildString(s.length + 2) {
  * the JVM's own Double.toString, which differs between versions and Android.
  */
 internal fun coordJson(x: Double): String {
-    val plain = BigDecimal(x).setScale(5, RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString()
-    return if ('.' in plain) plain else "$plain.0"
+    // x is the double nearest to units / 100000, so x * 1e5 is within far less
+    // than 0.5 of that integer.
+    val units = Math.rint(x * 1e5).toLong()
+    val sign = if (units < 0) "-" else ""
+    val abs = kotlin.math.abs(units)
+    val fraction = (abs % 100_000).toString().padStart(5, '0').trimEnd('0').ifEmpty { "0" }
+    return "$sign${abs / 100_000}.$fraction"
 }

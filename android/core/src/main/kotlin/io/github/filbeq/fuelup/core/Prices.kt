@@ -64,7 +64,7 @@ fun parsePrices(lines: Sequence<String>): PriceFile {
     val latest = LinkedHashMap<Triple<Long, String, Boolean>, Price>()
 
     for (line in iterator) {
-        if (line.stripSpace().isEmpty()) continue
+        if (line.isBlankSpace()) continue
         report.rowsRead++
         val fields = line.split(SEPARATOR).map(::cleanText)
         val ident = fields[0]
@@ -103,6 +103,9 @@ fun parsePrices(lines: Sequence<String>): PriceFile {
     return PriceFile(extractionDate, latest.values.toList(), report)
 }
 
+// ~60 distinct names in ~93k rows: classify each once.
+private val fuels = java.util.concurrent.ConcurrentHashMap<String, FuelInfo>()
+
 private fun parseRow(fields: List<String>, report: DropReport): Price? {
     val (ident, fuelName, priceText, selfText, dateText) = fields
     val stationId = parsePyInt(ident) ?: run {
@@ -128,7 +131,7 @@ private fun parseRow(fields: List<String>, report: DropReport): Price? {
     return Price(
         stationId = stationId,
         fuelName = fuelName,
-        fuel = classifyFuel(fuelName),
+        fuel = fuels.getOrPut(fuelName) { classifyFuel(fuelName) },
         priceMilli = priceMilli,
         isSelf = selfText == "1",
         updated = updated,
@@ -144,7 +147,7 @@ private val LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE)
  * are out of every plausible range anyway.
  */
 internal fun parsePriceMilli(text: String): Long? {
-    if (!PY_NUMBER.matches(text)) return null
+    if (!isPyNumber(text)) return null
     val milli = try {
         BigDecimal(text.replace("_", "")).movePointRight(3).setScale(0, RoundingMode.HALF_EVEN).toBigInteger()
     } catch (e: ArithmeticException) {
@@ -153,23 +156,43 @@ internal fun parsePriceMilli(text: String): Long? {
     return milli.max(LONG_MIN).min(LONG_MAX).toLong()
 }
 
-// "%d/%m/%Y %H:%M:%S" as Python's strptime reads it (single digits allowed).
-private val UPDATE_TIME = Regex(
-    """(3[01]|[12][0-9]|0[1-9]|[1-9])/(1[0-2]|0[1-9]|[1-9])/([0-9]{4}) """ +
-        """(2[0-3]|[01][0-9]|[0-9]):([0-5][0-9]|[0-9]):(6[01]|[0-5][0-9]|[0-9])"""
-)
-
 /**
- * Italian local time of a report ("29/09/2026 20:30:08") as an instant. A time
- * skipped or repeated by a DST change resolves like Python (fold=0) and Java's
- * default: the offset in force before the change.
+ * Italian local time of a report ("29/09/2026 20:30:08") as an instant: the
+ * format "%d/%m/%Y %H:%M:%S" as Python's strptime reads it (one or two digits
+ * for each part but the year). A time skipped or repeated by a DST change
+ * resolves like Python (fold=0) and Java's default: the offset in force before
+ * the change. A loop, not a regex: it runs for each of ~93k rows.
  */
 internal fun parseUpdateTime(text: String): Instant? {
-    val m = UPDATE_TIME.matchEntire(text) ?: return null
-    val (d, mo, y, h, mi, s) = m.destructured
-    if (y.toInt() == 0) return null // Python has no year 0
+    val parts = IntArray(6)
+    var i = 0
+    for (part in 0 until 6) {
+        val start = i
+        val maxDigits = if (part == 2) 4 else 2
+        var value = 0
+        while (i < text.length && i - start < maxDigits && text[i] in '0'..'9') {
+            value = value * 10 + (text[i] - '0')
+            i++
+        }
+        val digits = i - start
+        if (digits == 0 || (part == 2 && digits != 4)) return null
+        parts[part] = value
+        if (part < 5) {
+            val separator = when (part) {
+                0, 1 -> '/'
+                2 -> ' '
+                else -> ':'
+            }
+            if (i >= text.length || text[i] != separator) return null
+            i++
+        }
+    }
+    if (i != text.length) return null
+    val (d, mo, y) = Triple(parts[0], parts[1], parts[2])
+    val (h, mi, s) = Triple(parts[3], parts[4], parts[5])
+    if (d !in 1..31 || mo !in 1..12 || y == 0 || h > 23 || mi > 59 || s > 61) return null
     return try {
-        val local = LocalDateTime.of(y.toInt(), mo.toInt(), d.toInt(), h.toInt(), mi.toInt(), s.toInt())
+        val local = LocalDateTime.of(y, mo, d, h, mi, s)
         ZonedDateTime.ofLocal(local, ITALY_TZ, null).toInstant()
     } catch (e: DateTimeException) {
         null // e.g. 31/02, second 60 or 61

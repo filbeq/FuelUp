@@ -26,7 +26,6 @@ class FormatError(message: String) : Exception(message)
 /** Python's whitespace (`str.isspace`): what [cleanText] collapses and trims. */
 private const val WHITESPACE =
     "\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000"
-private val WHITESPACE_RUN = Regex("[$WHITESPACE]+")
 internal val WHITESPACE_CLASS = "[$WHITESPACE]"
 
 internal fun isSpace(c: Char): Boolean =
@@ -37,8 +36,37 @@ internal fun isSpace(c: Char): Boolean =
 /** Trim Python whitespace from both ends (Python's `str.strip()`). */
 internal fun String.stripSpace(): String = trim(::isSpace)
 
-/** Turn tabs and runs of whitespace into single spaces, and trim. */
-fun cleanText(value: String): String = value.replace(WHITESPACE_RUN, " ").trim(' ')
+/** Python's `not s.strip()`. */
+internal fun String.isBlankSpace(): Boolean = all(::isSpace)
+
+/**
+ * Turn tabs and runs of whitespace into single spaces, and trim. A loop, not a
+ * regex: it runs for every field of ~120k rows, and regexes are slow on Android.
+ */
+fun cleanText(value: String): String {
+    // Fast path: nothing to change (the common case).
+    var clean = value.isEmpty() || (!isSpace(value[0]) && !isSpace(value[value.length - 1]))
+    var i = 0
+    while (clean && i < value.length) {
+        val c = value[i]
+        if (isSpace(c) && (c != ' ' || isSpace(value[i + 1]))) clean = false
+        i++
+    }
+    if (clean) return value
+
+    val out = StringBuilder(value.length)
+    var pendingSpace = false
+    for (c in value) {
+        if (isSpace(c)) {
+            pendingSpace = out.isNotEmpty()
+        } else {
+            if (pendingSpace) out.append(' ')
+            pendingSpace = false
+            out.append(c)
+        }
+    }
+    return out.toString()
+}
 
 /**
  * Lines of a MIMIT file, decoded as strict UTF-8 (a byte-order mark is skipped)
@@ -69,24 +97,37 @@ internal fun splitLines(reader: Reader): Sequence<String> = sequence {
     while (true) {
         val n = reader.read(buffer)
         if (n < 0) break
-        for (i in 0 until n) {
-            val c = buffer[i]
-            if (atStart) {
-                atStart = false
-                if (c == '\uFEFF') continue
-            }
-            if (afterCr) {
-                afterCr = false
-                if (c == '\n') continue
-            }
-            if (isLineBreak(c.code)) {
+        var from = 0
+        if (atStart && n > 0) {
+            atStart = false
+            if (buffer[0] == '\uFEFF') from = 1
+        }
+        if (afterCr && from < n) {
+            afterCr = false
+            if (buffer[from] == '\n') from++
+        }
+        // Copy whole stretches between line breaks, not one character at a time.
+        var i = from
+        while (i < n) {
+            val c = buffer[i].code
+            if ((c <= 0x1e || c == 0x85 || c == 0x2028 || c == 0x2029) && isLineBreak(c)) {
+                line.appendRange(buffer, from, i)
                 yield(line.toString())
                 line.setLength(0)
-                afterCr = c == '\r'
+                i++
+                if (c == 0x0d) {
+                    if (i < n) {
+                        if (buffer[i] == '\n') i++
+                    } else {
+                        afterCr = true
+                    }
+                }
+                from = i
             } else {
-                line.append(c)
+                i++
             }
         }
+        line.appendRange(buffer, from, n)
     }
     if (line.isNotEmpty()) yield(line.toString())
 }
@@ -109,16 +150,65 @@ internal fun parseHeader(lines: Iterator<String>, expectedColumns: List<String>)
 
 /** Python's `int()` on already-cleaned text: optional sign, digits, single underscores. */
 internal fun parsePyInt(text: String): Long? {
-    if (!PY_INT.matches(text)) return null
-    return text.replace("_", "").toLongOrNull()
+    val negative = text.startsWith('-')
+    val start = if (negative || text.startsWith('+')) 1 else 0
+    val end = digitPart(text, start)
+    if (end == start || end != text.length) return null
+    var value = 0L
+    for (i in start until end) {
+        val c = text[i]
+        if (c == '_') continue
+        if (value > (Long.MAX_VALUE - 9) / 10) return null // beyond Long: no real id is
+        value = value * 10 + (c - '0')
+    }
+    return if (negative) -value else value
 }
 
-private val PY_INT = Regex("""[+-]?[0-9]+(_[0-9]+)*""")
+/**
+ * Whether [text] is a number in Python's decimal syntax (as `float()` and
+ * `Decimal()` accept it), without inf/nan:
+ * `[+-]? (digits [. digits?] | . digits) ([eE] [+-]? digits)?`, where digits
+ * may have single underscores between them.
+ */
+internal fun isPyNumber(text: String): Boolean {
+    var i = if (text.startsWith('+') || text.startsWith('-')) 1 else 0
+    val intEnd = digitPart(text, i)
+    val hasInt = intEnd > i
+    i = intEnd
+    if (i < text.length && text[i] == '.') {
+        val fracEnd = digitPart(text, i + 1)
+        if (!hasInt && fracEnd == i + 1) return false
+        i = fracEnd
+    } else if (!hasInt) {
+        return false
+    }
+    if (i < text.length && (text[i] == 'e' || text[i] == 'E')) {
+        var j = i + 1
+        if (j < text.length && (text[j] == '+' || text[j] == '-')) j++
+        val expEnd = digitPart(text, j)
+        if (expEnd == j) return false
+        i = expEnd
+    }
+    return i == text.length
+}
 
-/** Python's decimal number syntax (as `float()` and `Decimal()` accept it), without inf/nan. */
-internal val PY_NUMBER = Regex(
-    """[+-]?(([0-9](_?[0-9])*)(\.([0-9](_?[0-9])*)?)?|\.[0-9](_?[0-9])*)([eE][+-]?[0-9](_?[0-9])*)?"""
-)
+/** End of the digits starting at [start] (single underscores allowed between digits); [start] if none. */
+private fun digitPart(text: String, start: Int): Int {
+    var i = start
+    if (i >= text.length || text[i] !in '0'..'9') return start
+    i++
+    while (i < text.length) {
+        val c = text[i]
+        if (c in '0'..'9') {
+            i++
+        } else if (c == '_' && i + 1 < text.length && text[i + 1] in '0'..'9') {
+            i += 2
+        } else {
+            break
+        }
+    }
+    return i
+}
 
 /** Python's `str.casefold()`, close enough for names: full upper then lower case. */
 internal fun casefold(s: String): String = s.uppercase(java.util.Locale.ROOT).lowercase(java.util.Locale.ROOT)

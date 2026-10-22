@@ -133,6 +133,22 @@ class BuildTest {
         assertEquals("7.62133", coordJson(roundCoord(7.6213346)))
     }
 
+    /** The fast rounding and formatting against exact decimal arithmetic. */
+    @Test
+    fun coordinatesMatchExactArithmetic() {
+        val random = java.util.Random(42)
+        val values = List(1_000_000) { 6.0 + random.nextDouble() * 42.0 } +
+            // Halfway in decimal (but not in binary): the slow path.
+            List(10_000) { (600_000 + random.nextInt(4_200_000)) / 100_000.0 + 0.000005 }
+        for (x in values) {
+            val exact = java.math.BigDecimal(x).setScale(5, java.math.RoundingMode.HALF_EVEN)
+            val rounded = roundCoord(x)
+            assertEquals("$x", exact.toDouble(), rounded, 0.0)
+            val text = exact.stripTrailingZeros().toPlainString().let { if ('.' in it) it else "$it.0" }
+            assertEquals("$x", text, coordJson(rounded))
+        }
+    }
+
     @Test
     fun jsonStringsLikePython() {
         assertEquals("\"a\\\"b\\\\c\\n\\t\\u0001é–\"", jsonString("a\"b\\c\n\t\u0001é–"))

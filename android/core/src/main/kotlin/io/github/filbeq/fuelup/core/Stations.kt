@@ -3,6 +3,7 @@ package io.github.filbeq.fuelup.core
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
@@ -70,7 +71,7 @@ fun parseStations(lines: Sequence<String>): StationFile {
     val stations = LinkedHashMap<Long, Station>()
 
     for (line in iterator) {
-        if (line.stripSpace().isEmpty()) continue
+        if (line.isBlankSpace()) continue
         report.rowsRead++
         var fields = line.split(SEPARATOR)
         val ident = cleanText(fields[0])
@@ -101,7 +102,8 @@ fun parseStations(lines: Sequence<String>): StationFile {
             continue
         }
 
-        val name = cleanText(fields[4].replace(JUNK_RE, ""))
+        // The junk suffix always comes with a "|": skip the (slow) regex otherwise.
+        val name = cleanText(if ('|' in fields[4]) fields[4].replace(JUNK_RE, "") else fields[4])
         if (name.isEmpty()) report.note("empty station name", stationId)
         stations[stationId] = Station(
             id = stationId,
@@ -137,13 +139,15 @@ private fun dropMisplaced(stations: LinkedHashMap<Long, Station>, report: DropRe
         // Most stations have one of their own province nearby: cheap check first.
         val hasNear = (row - 1..row + 1).any { r ->
             (col - 1..col + 1).any { c ->
-                cells[Triple(s.province, r, c)].orEmpty().any { o -> otherSpot(s, o) && km(s, o) <= MISPLACED_KM }
+                cells[Triple(s.province, r, c)].orEmpty().any { o ->
+                    otherSpot(s, o) && latKm(s, o) <= MISPLACED_KM && km(s, o) <= MISPLACED_KM
+                }
             }
         }
         if (hasNear) continue
         // The only station of its province: nothing to compare with.
-        val own = byProvince.getValue(s.province).filter { otherSpot(s, it) }.minOfOrNull { km(s, it) } ?: continue
-        val other = stations.values.filter { it.province != s.province }.minOfOrNull { km(s, it) }
+        val own = nearestKm(s, byProvince.getValue(s.province)) { otherSpot(s, it) } ?: continue
+        val other = nearestKm(s, stations.values) { it.province != s.province }
         if (other != null && other * MISPLACED_RATIO < own) misplaced.add(Misplaced(s, own, other))
     }
 
@@ -163,6 +167,31 @@ private fun otherSpot(s: Station, o: Station): Boolean = o.id != s.id && (o.lat 
 
 private fun row(s: Station): Int = floor(s.lat / CELL_DEG).toInt()
 private fun col(s: Station): Int = floor(s.lon / CELL_DEG).toInt()
+
+/**
+ * Distance from [s] to the nearest of [candidates] that pass [filter], or null.
+ * Skips a candidate whose latitude difference alone exceeds the best so far:
+ * its distance can't be smaller ([km] is never below [latKm]), so the result is
+ * exactly the minimum, with far fewer [km] calls (cos and hypot are slow on Android).
+ */
+private inline fun nearestKm(s: Station, candidates: Collection<Station>, filter: (Station) -> Boolean): Double? {
+    var best = Double.POSITIVE_INFINITY
+    var found = false
+    for (o in candidates) {
+        if (!filter(o)) continue
+        found = true
+        if (latKm(s, o) > best) continue
+        val d = km(s, o)
+        if (d < best) best = d
+    }
+    return if (found) best else null
+}
+
+/**
+ * The north-south part of [km], computed the same way: [km] is never smaller,
+ * since hypot(x, y) >= |y| holds exactly in floating point too.
+ */
+private fun latKm(a: Station, b: Station): Double = abs((a.lat - b.lat) * KM_PER_DEG_LAT)
 
 /** Distance in km; a flat approximation, fine at these scales. */
 private fun km(a: Station, b: Station): Double {
@@ -213,7 +242,7 @@ private fun parseCoords(latField: String, lonField: String): Coords {
 
 /** Python's `float()` on stripped text; inf/nan come back non-finite. */
 private fun parsePyFloat(text: String): Double? {
-    if (PY_NUMBER.matches(text)) return text.replace("_", "").toDouble()
+    if (isPyNumber(text)) return text.replace("_", "").toDouble()
     return when (text.lowercase(java.util.Locale.ROOT).removePrefix("+").removePrefix("-")) {
         "inf", "infinity" -> Double.POSITIVE_INFINITY
         "nan" -> Double.NaN
@@ -221,6 +250,21 @@ private fun parsePyFloat(text: String): Double? {
     }
 }
 
-/** Python's `round(x, 5)`: half to even on the exact binary value. */
-internal fun roundCoord(x: Double): Double =
-    BigDecimal(x).setScale(COORD_DECIMALS, RoundingMode.HALF_EVEN).toDouble()
+/**
+ * Python's `round(x, 5)`: half to even on the exact binary value, giving the
+ * double nearest to the rounded decimal. `x * 1e5` is off by far less than
+ * 1e-6, so unless it lies that close to a half, its nearest integer is the
+ * exact answer; only those rare cases need BigDecimal (slow on Android).
+ */
+internal fun roundCoord(x: Double): Double {
+    val scaled = x * COORD_SCALE
+    val floor = floor(scaled)
+    val fraction = scaled - floor
+    if (abs(fraction - 0.5) < 1e-6 || abs(scaled) > 1e15) {
+        return BigDecimal(x).setScale(COORD_DECIMALS, RoundingMode.HALF_EVEN).toDouble()
+    }
+    val units = if (fraction < 0.5) floor else floor + 1
+    return units / COORD_SCALE // exact operands: the double nearest to units / 100000
+}
+
+private const val COORD_SCALE = 1e5
