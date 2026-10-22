@@ -22,6 +22,7 @@
     <string name="about_data_title">Price data</string>
     <string name="about_data_source">Data source: Ministry of Enterprises and Made in Italy — Osservaprezzi Carburanti</string>
     <string name="about_data_license">Released under the Italian Open Data License 2.0 (IODL 2.0).</string>
+    <string name="about_data_sources">FuelUp downloads the prices directly from the Ministry and cleans them on your phone. When that isn\'t possible (the Ministry only answers connections from Italy), it uses a copy that FuelUp publishes, made with the same rules. Settings shows where the prices on screen come from.</string>
     <string name="about_open_dataset">Open the dataset page</string>
     <string name="about_open_license">Open the license</string>
     <string name="about_map_title">Map</string>
@@ -146,6 +147,9 @@
     <string name="update_result_up_to_date">Already up to date (%1$s)</string>
     <string name="update_result_offline">No connection: try again when you\'re online</string>
     <string name="update_result_failed">Update failed: try again later</string>
+    <string name="settings_source_mimit">Source: downloaded from the Ministry (MIMIT)</string>
+    <string name="settings_source_pages">Source: FuelUp\'s published copy</string>
+    <string name="settings_mimit_unreachable">The Ministry only answers connections from Italy: from this network the prices come from FuelUp\'s copy, which may be older.</string>
     <string name="language_system">System default</string>
     <!-- Each language name is written in its own language. -->
     <string name="language_italian" translatable="false">Italiano</string>

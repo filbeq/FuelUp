@@ -120,6 +120,8 @@ fun FuelUpApp(
                         dataUpdate = mapState.manualUpdate,
                         lastChecked = mapState.lastChecked,
                         currentPricesAt = mapState.snapshot?.meta?.pricesAt,
+                        origin = mapState.snapshot?.origin,
+                        mimitUnreachable = mapState.mimitUnreachable == true,
                         onUpdateNow = mapViewModel::updateNow,
                         onOpenAbout = { backStack.add(AboutRoute) },
                         onBack = { backStack.removeAt(backStack.lastIndex) },

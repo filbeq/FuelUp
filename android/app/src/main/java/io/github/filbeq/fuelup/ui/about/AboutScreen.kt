@@ -77,6 +77,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Section(R.string.about_data_title)
             Body(R.string.about_data_source)
             Body(R.string.about_data_license)
+            Body(R.string.about_data_sources)
             Link(stringResource(R.string.about_open_dataset), DATASET_URL)
             Link(stringResource(R.string.about_open_license), LICENSE_URL)
 

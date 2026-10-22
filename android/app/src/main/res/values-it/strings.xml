@@ -19,6 +19,7 @@
     <string name="about_data_title">Dati sui prezzi</string>
     <string name="about_data_source">Fonte dati: Ministero delle Imprese e del Made in Italy — Osservaprezzi Carburanti</string>
     <string name="about_data_license">Dati rilasciati con licenza Italian Open Data License 2.0 (IODL 2.0).</string>
+    <string name="about_data_sources">FuelUp scarica i prezzi direttamente dal Ministero e li elabora sul telefono. Quando non è possibile (il Ministero risponde solo da reti italiane), usa una copia pubblicata da FuelUp, preparata con le stesse regole. Le Impostazioni indicano da dove arrivano i prezzi mostrati.</string>
     <string name="about_open_dataset">Apri la pagina del dataset</string>
     <string name="about_open_license">Apri la licenza</string>
     <string name="about_map_title">Mappa</string>
@@ -140,6 +141,9 @@
     <string name="update_result_up_to_date">Già aggiornato (%1$s)</string>
     <string name="update_result_offline">Nessuna connessione: riprova quando sei online</string>
     <string name="update_result_failed">Aggiornamento non riuscito: riprova più tardi</string>
+    <string name="settings_source_mimit">Fonte: scaricati dal Ministero (MIMIT)</string>
+    <string name="settings_source_pages">Fonte: copia pubblicata da FuelUp</string>
+    <string name="settings_mimit_unreachable">Il Ministero risponde solo da reti italiane: da questa rete i prezzi arrivano dalla copia di FuelUp, che può essere meno recente.</string>
     <string name="language_system">Predefinita di sistema</string>
     <string name="action_my_location">La mia posizione</string>
     <string name="action_open_app_settings">Apri impostazioni</string>

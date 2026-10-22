@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.filbeq.fuelup.R
 import io.github.filbeq.fuelup.data.AppSettings
+import io.github.filbeq.fuelup.data.DataOrigin
 import io.github.filbeq.fuelup.data.MapStyleMode
 import io.github.filbeq.fuelup.data.RefreshResult
 import io.github.filbeq.fuelup.data.ThemeMode
@@ -74,6 +75,10 @@ fun SettingsScreen(
     dataUpdate: ManualUpdate,
     lastChecked: Instant?,
     currentPricesAt: String?,
+    /** Where the prices shown came from (null: no data yet). */
+    origin: DataOrigin?,
+    /** The last attempt to reach MIMIT got no answer (as from outside Italy). */
+    mimitUnreachable: Boolean,
     onUpdateNow: () -> Unit,
     onOpenAbout: () -> Unit,
     onBack: () -> Unit,
@@ -126,7 +131,7 @@ fun SettingsScreen(
             LanguageMenu(language, onLanguageChange, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
             SectionTitle(R.string.settings_data)
-            UpdateNowRow(dataUpdate, lastChecked, currentPricesAt, onUpdateNow)
+            UpdateNowRow(dataUpdate, lastChecked, currentPricesAt, origin, mimitUnreachable, onUpdateNow)
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             ListItem(
@@ -150,10 +155,18 @@ private fun SectionTitle(@StringRes title: Int) {
 
 /**
  * "Update data now": asks the server even if today's data is already here, then
- * says what happened. Under it, when the server was last checked.
+ * says what happened. Under it, where the prices shown came from, why MIMIT
+ * can't be used (when it gave no answer) and when the server was last checked.
  */
 @Composable
-private fun UpdateNowRow(update: ManualUpdate, lastChecked: Instant?, currentPricesAt: String?, onUpdateNow: () -> Unit) {
+private fun UpdateNowRow(
+    update: ManualUpdate,
+    lastChecked: Instant?,
+    currentPricesAt: String?,
+    origin: DataOrigin?,
+    mimitUnreachable: Boolean,
+    onUpdateNow: () -> Unit,
+) {
     val locale = LocalConfiguration.current.locales[0]
     val running = update == ManualUpdate.Running
     val checkedText = lastChecked?.let {
@@ -180,6 +193,17 @@ private fun UpdateNowRow(update: ManualUpdate, lastChecked: Instant?, currentPri
                 outcome?.let { (text, isError) ->
                     Text(text, color = if (isError) MaterialTheme.colorScheme.error else Color.Unspecified)
                 }
+                origin?.let {
+                    Text(
+                        stringResource(
+                            when (it) {
+                                DataOrigin.MIMIT -> R.string.settings_source_mimit
+                                DataOrigin.PAGES -> R.string.settings_source_pages
+                            }
+                        )
+                    )
+                }
+                if (mimitUnreachable) Text(stringResource(R.string.settings_mimit_unreachable))
                 Text(checkedText)
             }
         },
