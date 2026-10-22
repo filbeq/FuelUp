@@ -1,10 +1,25 @@
 name: CI
 
-# Runs on every push (any branch) and every pull request. Publishing the data
-# is a separate workflow (publish-data.yml).
+# Runs on pushes to main and on pull requests that change code. Docs-only
+# changes (any .md file) and other workflow files don't start it: CI can't
+# test those (publish and release have manual dry runs). "Run workflow" in the
+# Actions tab runs it by hand. Publishing the data is a separate workflow
+# (publish-data.yml).
 on:
   push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "pipeline/**"
+      - ".github/workflows/ci.yml"
+      - "!**/*.md"
   pull_request:
+    paths:
+      - "android/**"
+      - "pipeline/**"
+      - ".github/workflows/ci.yml"
+      - "!**/*.md"
+  workflow_dispatch:
 
 permissions:
   contents: read
