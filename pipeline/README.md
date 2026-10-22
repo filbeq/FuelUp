@@ -4,30 +4,37 @@ Downloads the MIMIT "Osservaprezzi Carburanti" open data, cleans it, and writes
 two files for the app: `stations.json` (all stations with their prices) and
 `meta.json` (data date, counts, checksum).
 
-Python 3.12+, standard library only — nothing to install.
+The code is Kotlin: the cleaning in [`android/core`](../android/core) (shared
+with the app, which downloads MIMIT directly) and the `fuel-data` command line
+in [`android/cli`](../android/cli), which builds what GitHub Pages publishes.
+Until 22 Oct 2026 it was Python, in this folder; the Kotlin port gave identical
+output on 182 days of MIMIT's archive. This file stays the reference for the
+cleaning rules and the JSON format. What is left here in Python is the
+freshness alarm (`fuel_pipeline/freshness.py`, see DEVELOPMENT.md
+"Freshness alarm").
 
 ## Usage
 
-Run everything from this `pipeline/` directory.
+From `android/`:
 
 ```sh
+./gradlew :core:test :cli:installDist          # tests, then build the CLI
+
 # Download today's files from MIMIT and build the output into out/
-python3 -m fuel_pipeline
+cli/build/install/fuel-data/bin/fuel-data
 
 # Rebuild from files already on disk (no network)
-python3 -m fuel_pipeline --prices data/prezzo_alle_8.csv \
-                         --stations data/anagrafica_impianti_attivi.csv
+cli/build/install/fuel-data/bin/fuel-data --prices data/prezzo_alle_8.csv \
+                                          --stations data/anagrafica_impianti_attivi.csv
 
 # Options: --out DIR (default out/), --data-dir DIR (default data/)
-
-# Run the tests
-python3 -m unittest -v
 ```
 
 Downloads go to `data/`, output goes to `out/`; both are git-ignored. Each run logs
 what was dropped or fixed, by reason, with sample station ids. The exit code is 1
 (and nothing is written) if a download fails, the file format changed, or the data
-looks broken (see *Safety checks*).
+looks broken (see *Safety checks*). MIMIT answers only Italian IP addresses
+(since 16 Oct 2026).
 
 ## Source data
 

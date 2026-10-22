@@ -4,27 +4,38 @@ How the project is organised and how to build, run and publish it. For what the
 app is, see the [README](README.md).
 
 ```
-pipeline/   Python data pipeline: download MIMIT data, clean it, write JSON
-android/    Android app (Kotlin, Jetpack Compose, MapLibre)
-.github/    GitHub Actions: CI on every push (tests, lint, contract check), the
-            workflow that publishes the data to GitHub Pages, and a check
-            that the published data is up to date
+android/    Android app (Kotlin, Jetpack Compose, MapLibre), plus the data
+            pipeline: android/core (cleaning, shared by the app) and
+            android/cli (the command line that builds the published data)
+pipeline/   Python freshness alarm (is the published data up to date?), and
+            the documentation of the cleaning rules and the JSON format
+.github/    GitHub Actions: CI on code changes, the workflow that publishes
+            the data to GitHub Pages (with the freshness alarm), releases
 ```
 
 ## Data pipeline
 
-Requires Python 3.12, no third-party packages. Run from `pipeline/`:
+The cleaning code is Kotlin in `android/core` (plain JVM, no Android), used by
+the app (which downloads MIMIT directly) and by the `fuel-data` command line in
+`android/cli`, which builds what GitHub Pages publishes. Until 22 Oct 2026 this
+was a Python pipeline; the Kotlin port gave identical output on 182 days of
+MIMIT's archive. Run from `android/`:
 
 ```sh
-python3 -m unittest            # run the tests
-python3 -m fuel_pipeline       # download MIMIT data, write out/stations.json + out/meta.json
+./gradlew :core:test :cli:installDist          # tests, then build the CLI
+cli/build/install/fuel-data/bin/fuel-data      # download MIMIT data, write out/stations.json + out/meta.json
 
 # rebuild from files already downloaded (no network)
-python3 -m fuel_pipeline --prices data/prezzo_alle_8.csv \
-                         --stations data/anagrafica_impianti_attivi.csv
+cli/build/install/fuel-data/bin/fuel-data --prices data/prezzo_alle_8.csv \
+                                          --stations data/anagrafica_impianti_attivi.csv
+# options: --data-dir DIR (downloads, default data/), --out DIR (default out/)
 ```
 
-`data/` and `out/` are git-ignored, and `out/` is whatever you last built: before
+MIMIT answers only Italian IP addresses (since 16 Oct 2026), so the download
+works from home, not from GitHub. Exit code 1 (and nothing written) when a
+download fails or the data looks broken.
+
+`data/` and `out/` are whatever you last downloaded and built: before
 analysing the data, rebuild it or use the published file
 (https://filbeq.github.io/FuelUp/stations.json). An old `out/` misses later
 pipeline fixes (it once still held the stations dropped for misplaced
@@ -33,77 +44,122 @@ format are documented in [pipeline/README.md](pipeline/README.md).
 
 ## Continuous integration
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and
-pull request:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main`
+and on pull requests **that change code**: anything under `android/` or
+`pipeline/`, or `ci.yml` itself, except `.md` files. Docs-only commits and
+changes to the other workflows start nothing (those workflows have manual dry
+runs instead). "Run workflow" in the Actions tab runs it by hand. A newer push
+cancels the older run; Gradle's cache is kept between runs.
 
 | Job | Checks |
 |---|---|
-| Pipeline tests and app contract | `python -m unittest` in `pipeline/`, then `python scripts/make_android_fixture.py --check` |
-| App unit tests and lint | `./gradlew test lint assembleRelease` in `android/` (JDK 21; the Gradle wrapper is validated; the release APK is built unsigned, to catch R8 problems early) |
+| Freshness alarm tests | `python -m unittest` in `pipeline/` |
+| App, core and CLI tests, lint | `./gradlew test lint assembleRelease` in `android/` (JDK 21; the Gradle wrapper is validated; the release APK is built unsigned, to catch R8 problems early) |
 
-The contract check regenerates the app's test fixture from the pipeline and
-fails, with a diff, if it differs from the committed one. When it fails, the
-pipeline's output format changed: run `python3 pipeline/scripts/make_android_fixture.py`,
-run `./gradlew test` to see whether the app still reads it, and commit both.
+**Pipeline/app contract:** `BuildTest.outputMatchesTheAppFixture` in
+`android/core` builds the published files from the core's test CSVs and
+compares them, byte for byte, with the app's test fixture
+(`app/src/test/resources/fixtures/*.json`), which the app's tests parse. When it
+fails, the published format changed: if that was intended, run
+`./gradlew :core:test -PupdateAppFixture` (rewrites the fixture), then
+`./gradlew test` to see whether the app still reads it, and commit both.
 
 Run the same checks locally before pushing:
 
 ```sh
-(cd pipeline && python3 -m unittest && python3 scripts/make_android_fixture.py --check)
+(cd pipeline && python3 -m unittest)
 (cd android && ./gradlew test lint assembleRelease)
 ```
 
 ## Data publishing (GitHub Pages)
 
 The workflow [`.github/workflows/publish-data.yml`](.github/workflows/publish-data.yml)
-runs the pipeline tests and the same contract check as CI, then the pipeline,
-then deploys the output to GitHub Pages. It runs every 2 hours from 07:10 to
-21:10 UTC (MIMIT publishes around 06:45 UTC) and on demand. A first `check` job
-compares MIMIT's extraction date with the published `dataDate` and skips the
-build when nothing is new (about 20 seconds); a manual run always publishes.
-If the tests or the pipeline fail, nothing is deployed and the previous data stays
-online. The data is never committed to the repository.
+builds the data with the CLI and deploys it to GitHub Pages. The data is never
+committed to the repository. Jobs:
 
-Why so many runs: GitHub starts scheduled runs late (4.5–6.5 hours on 2 Oct
-2026) or drops them (3 Oct 2026: none). One run out of eight is enough.
+1. **check** (~20 s): compares MIMIT's extraction date with the published
+   `dataDate` and decides whether to build.
+2. **build**: `./gradlew :core:test :cli:installDist`, then the CLI. If the
+   tests or the CLI fail, nothing is deployed and the previous data stays
+   online.
+3. **deploy** to Pages.
+4. **alarm**: the freshness check (see below).
+5. **resumed**: after a gap, a comment on issue #4 (see below).
+
+**Schedule:** 07:10, 08:40, 10:10 and 13:10 UTC. MIMIT publishes around 06:45
+UTC. GitHub starts scheduled runs late (about 5 hours in October 2026) or drops
+about half of them, so there are four tries; once one has published, the
+others stop after `check`. 13:10 UTC is after the alarm's 14:00 Italian
+deadline in summer and winter time.
+
+| Situation | What the scheduled runs do |
+|---|---|
+| New MIMIT data | the first run builds and deploys; the later ones skip |
+| MIMIT unreachable (it blocks GitHub) | every run: no build, green, with a warning "MIMIT blocks GitHub" in the run summary. Phones in Italy download from MIMIT directly; the Pages copy is the fallback for the others |
+| MIMIT reachable, but builds keep failing for over a day (published data older than the day before yesterday) | **backoff**: only the first run that starts each day builds (it reads today's earlier runs with `gh run list`), so one failure email a day |
+| Publishing works again after such a gap | the `resumed` job comments on issue #4, so the owner gets a notification |
+
+A manual run (Actions tab → **Publish fuel data** → **Run workflow**, branch
+`main`) always builds, e.g. to republish a fix for the same date. Its
+`dry_run_published_date` input publishes nothing and only runs the alarm with
+a fake published date. When a real run is green, check:
 
 | File | URL |
 |---|---|
 | Station data | https://filbeq.github.io/FuelUp/stations.json |
 | Metadata (data date, counts, checksum) | https://filbeq.github.io/FuelUp/meta.json |
 
-**One-time setup:** repository Settings → Pages → Build and deployment →
-Source: "GitHub Actions".
-
-**Run it manually:** Actions tab → **Publish fuel data** → **Run workflow**
-(branch `main`) → **Run workflow**. When the run is green, check:
-
 ```sh
 curl -s https://filbeq.github.io/FuelUp/meta.json   # dataDate = date the prices refer to
 ```
 
+**One-time setup:** repository Settings → Pages → Build and deployment →
+Source: "GitHub Actions".
+
 GitHub disables scheduled workflows in public repositories after 60 days without
 commits; re-enable it from the Actions tab if that happens.
 
-### Staleness alarm
+### Freshness alarm
 
-[`.github/workflows/check-data.yml`](.github/workflows/check-data.yml) runs four
-times a day (10:40, 13:40, 16:40, 19:40 UTC) and **fails** when:
+The publish workflow's last job, `alarm`, **fails** when MIMIT can be reached
+and:
 
 - MIMIT has had newer prices for more than 3 hours and they are not published, or
 - by 14:00 Italian time the published data doesn't hold yesterday's prices (this
   also catches MIMIT itself not publishing).
 
-GitHub emails the repository owner about failed scheduled runs (Settings →
-Notifications → Actions), and the README badge turns red. The run page lists
-what's wrong and the fix (run **Publish fuel data** by hand).
+It doesn't run after a successful deploy (the data is new by construction, and
+Pages can serve the old `meta.json` for a few minutes) or in a run the backoff
+stopped. MIMIT unreachable is never a failure: from GitHub nothing can be
+checked then, and phones in Italy don't depend on the Pages copy. The owner's
+own phone ("Aggiornamento in ritardo") and a CLI run from home are the
+canaries for a MIMIT format change.
+
+**What emails the owner** (GitHub emails about failed runs: Settings →
+Notifications → Actions; scheduled runs notify whoever last changed the cron
+lines):
+
+| Event | Emails |
+|---|---|
+| Build, CLI or deploy fails while MIMIT is reachable | one per run on the first day (≤ 4), then one a day (backoff) |
+| Alarm fails (see above) | in the same run, so the same email |
+| MIMIT blocks GitHub | none (green runs with a warning) |
+| Publishing works again after a gap | a notification for the comment on issue #4 |
+| CI fails on a code push or PR | one per failing run, to the pusher |
+| Release workflow fails | one per tag |
+| GitHub drops every scheduled run of a day | none: nothing ran, so nothing failed (known gap) |
+
+The README badge shows the last scheduled publish run, so red means "something
+we publish is broken", not "phones lack prices".
 
 Rules and tests: `pipeline/fuel_pipeline/freshness.py`,
-`pipeline/tests/test_freshness.py`. To see a failure without waiting for one:
-Actions tab → **Check published data** → **Run workflow** → enter an old date
-(e.g. `2026-09-30`) as the fake published date. Or locally, from `pipeline/`:
+`pipeline/tests/test_freshness.py`. To try it: a manual publish run with an old
+date (e.g. `2026-09-30`) as `dry_run_published_date` (while MIMIT blocks
+GitHub it ends green with the warning). Or locally, from `pipeline/` (MIMIT
+answers from Italy):
 
 ```sh
+python3 -m fuel_pipeline.freshness needs-publish                       # what the check job decides
 python3 -m fuel_pipeline.freshness check                               # real check
 python3 -m fuel_pipeline.freshness check --published-date 2026-09-30   # dry run
 ```
@@ -266,10 +322,10 @@ already have that date by themselves. They get the fix with the next day's
 data, or at once with **Update data now** in Settings. Publishing a fix under a
 new date is not possible (the date is the price date).
 
-**Test fixture:** the app's unit tests parse files generated by the pipeline
+**Test fixture:** the app's unit tests parse files built by `android/core`
 itself. After changing the JSON format, run
-`python3 pipeline/scripts/make_android_fixture.py` and commit the result
-(CI and the publish workflow fail until you do; see *Continuous integration*).
+`./gradlew :core:test -PupdateAppFixture` and commit the result (CI and the
+publish workflow fail until you do; see *Continuous integration*).
 
 ### Performance (measured)
 

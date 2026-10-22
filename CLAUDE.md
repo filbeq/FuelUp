@@ -12,8 +12,9 @@ small enough to be tested on a real phone before moving on.
 
 - Monorepo on GitHub:
   ```
-  /pipeline    Python data pipeline (download, clean, publish JSON)
-  /android     Android app (Kotlin + Jetpack Compose)
+  /pipeline    Python freshness alarm; docs of cleaning rules + JSON format
+  /android     Android app (Kotlin + Jetpack Compose); data pipeline in
+               android/core (cleaning, shared with the app) + android/cli
   /.github     GitHub Actions workflows
   /release-notes  user-facing notes per app version (X.Y.Z.md)
   ```
@@ -89,12 +90,15 @@ small enough to be tested on a real phone before moving on.
 
 ## Pipeline (/pipeline)
 
-- Python 3.12, `pathlib` over `os`, minimal dependencies (stdlib only so far;
-  add packages only with a clear reason). Lines are split on `|` by hand rather
-  than with the `csv` module, since the files have no quoting.
-- Run from `pipeline/`: `python3 -m unittest`, `python3 -m fuel_pipeline`.
-- Before any data analysis, rebuild `pipeline/out/` from current code
-  (`python3 -m fuel_pipeline`, or `--prices/--stations` on fresh CSVs) or use
+- Since 22 Oct 2026 (issue #4 step 5) the pipeline is Kotlin: cleaning in
+  `android/core` (plain JVM, no dependencies, also used by the app), command
+  line `fuel-data` in `android/cli` (from `android/`: `./gradlew :core:test
+  :cli:installDist`, then `cli/build/install/fuel-data/bin/fuel-data`, or
+  `--prices/--stations` on CSVs). Lines are split on `|` by hand (no
+  quoting). The Python cleaning was removed after identical output on 182
+  archive days; only `pipeline/fuel_pipeline/freshness.py` (monitoring,
+  Python 3.12 stdlib) stays, run from `pipeline/`: `python3 -m unittest`.
+- Before any data analysis, rebuild `out/` from current code (the CLI) or use
   the published `stations.json`; never a stale `out/` (git-ignored, rebuilt
   only by hand). A stale one once showed stations the pipeline already drops.
   JSON format and cleaning rules are documented in `pipeline/README.md`.
@@ -111,23 +115,38 @@ small enough to be tested on a real phone before moving on.
 - Refuse to write output when the data looks broken (different extraction
   dates, >10% of rows dropped, too few stations/prices), so a bad upstream
   file is never published.
-- Unit tests with fixture rows that reproduce the real quirks.
-- Scheduled GitHub Action: run tests, build JSON, publish to GitHub Pages via
-  `actions/deploy-pages` (do NOT commit daily data to `main`). GitHub starts
-  scheduled runs hours late or drops them (seen 2–3 Oct 2026: runs 4.5–6.5 h late,
-  then none), so it runs every 2 h (07:10–21:10 UTC, off the hour); a first
-  `check` job (`python -m fuel_pipeline.freshness needs-publish`) skips the
-  build when MIMIT's `Estrazione del` date equals the published `dataDate`.
-  A manual run always publishes.
-- Staleness alarm (`.github/workflows/check-data.yml`, 4 runs a day): fails, so
-  GitHub emails the owner, when MIMIT has had newer prices for > 3 h, or when
-  yesterday's prices aren't published by 14:00 Italian time. Dry run: "Run
-  workflow" with a fake published date. README shows its badge.
+- Unit tests with fixture rows that reproduce the real quirks
+  (`android/core/src/test/resources/fixtures/`).
+- Publishing (`.github/workflows/publish-data.yml`, lean since 22 Oct 2026):
+  jobs check → build (`:core:test`, CLI) → deploy to Pages via
+  `actions/deploy-pages` (never commit daily data to `main`) → alarm →
+  resumed. Crons 07:10, 08:40, 10:10, 13:10 UTC: GitHub starts scheduled runs
+  ~5 h late and drops ~half; 13:10 is after the 14:00 Italian deadline in
+  both DST states. `check` (`freshness needs-publish`) skips the build when
+  MIMIT's `Estrazione del` date equals the published `dataDate`, and when
+  MIMIT is unreachable (green, warning: it blocks GitHub). Backoff: MIMIT
+  reachable but published data older than the day before yesterday (`stale`)
+  → only the first scheduled run that starts each day builds (earlier runs
+  read with `gh run list`), one failure email a day. `resumed`: after a
+  stale gap, a successful deploy comments on issue #4 (notifies the owner).
+  Manual run always builds; input `dry_run_published_date` = alarm only.
+- Freshness alarm (`alarm` job, merged from the deleted `check-data.yml`):
+  fails, so GitHub emails the owner, when MIMIT is reachable and has had newer
+  prices for > 3 h, or yesterday's prices aren't published by 14:00 Italian
+  time. Not after a successful deploy (Pages may serve the old meta.json for
+  minutes), not in backed-off runs; MIMIT unreachable is never a failure.
+  README badge = last scheduled publish run. Email table: DEVELOPMENT.md
+  "Freshness alarm". Known gap: a day with every scheduled run dropped emails
+  nothing.
 - Version the JSON schema; the app must reject unknown major versions gracefully.
-- CI (`.github/workflows/ci.yml`, every push/PR): pipeline tests, the
-  pipeline/app contract check (`make_android_fixture.py --check`), and the
-  app's `./gradlew test lint assembleRelease` (unsigned, catches R8 failures).
-  The publish workflow runs the same contract check before deploying.
+- CI (`.github/workflows/ci.yml`): pushes to `main` and PRs changing
+  `android/**`, `pipeline/**` or `ci.yml`, never `.md`-only (docs commits run
+  nothing); manual run possible; concurrency cancels superseded runs; Gradle
+  cache via `setup-gradle`. Jobs: freshness tests, and `./gradlew test lint
+  assembleRelease` (unsigned, catches R8 failures). Contract: the `:core`
+  golden test `BuildTest.outputMatchesTheAppFixture` (regenerate the app
+  fixture with `./gradlew :core:test -PupdateAppFixture`); the publish build
+  runs it too.
 
 ## Android app (/android)
 
@@ -411,9 +430,9 @@ small enough to be tested on a real phone before moving on.
     (`last_meta_check`); a failed check doesn't count as checked
   - unknown major `schemaVersion`: keep the cache, show "please update"
   - stations reach MapLibre as a GeoJSON string built off the main thread
-  - pipeline/app contract: the app's test fixture is generated by
-    `pipeline/scripts/make_android_fixture.py`; regenerate it after schema
-    changes (CI fails otherwise)
+  - pipeline/app contract: the app's test fixture must match `android/core`'s
+    output (golden test); regenerate it after schema changes with
+    `./gradlew :core:test -PupdateAppFixture` (CI fails otherwise)
 - Localization from day one:
   - no hard-coded user-facing strings; everything in `strings.xml`
   - `values/` = English (default), `values-it/` = Italian
@@ -519,7 +538,8 @@ personal use on the test phone. Done in step 8 so far:
 - 8.10 (issue #2): data date label, see "Data" above; checked on the phone
   (after midnight, and "ieri" / late with a shifted test clock; About).
 - Publishing made robust: every 2 h with skip-if-unchanged, plus a staleness
-  alarm (`check-data.yml`); both verified on GitHub on 2026-10-03.
+  alarm (`check-data.yml`); both verified on GitHub on 2026-10-03 (replaced
+  by the lean publish workflow on 2026-10-22).
 
 Step 9 (first GitHub pre-release, 0.1.0): release build, signing, release
 workflow, licence, README done; release build tested on the phone on
@@ -543,13 +563,16 @@ Next: the rest of step 8 (see the backlog below).
 ### Issue #4 status (2026-10-22, in progress)
 
 MIMIT answers only Italian IPs since 16 Oct 2026, so GitHub can't publish.
-Plan steps 0–4 are done: cleaning ported to `android/core` (identical to the
+Plan steps 0–6 are done: cleaning ported to `android/core` (identical to the
 Python pipeline on 182 archive days), `android/cli`, and the app downloads
 MIMIT directly with the Pages copy as fallback and shows the source in Settings.
-Steps 5–7 are left (workflows on the CLI + remove the Python cleaning, alarm, docs),
-plus the open checks. Full plan, decisions, measurements and what's left:
+Steps 5–6 (22 Oct) were folded into a leaner CI/CD: publish with the CLI,
+Python cleaning removed, alarm merged into publish, backoff, CI path filters
+(see "Pipeline" above). Verified on GitHub: dry run green with the block
+warning; manual run builds the CLI, fails at the blocked download. Step 7
+(remaining docs: code map, data flow, release notes 0.3.0) is left, plus the
+open checks. Full plan, decisions, measurements and what's left:
 https://github.com/filbeq/FuelUp/issues/4#issuecomment-6351286850
-Until step 7, the sections above still describe the Python pipeline.
 
 ### Open issues (known, not yet fixed)
 

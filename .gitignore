@@ -6,7 +6,11 @@ venv/
 .pytest_cache/
 .mypy_cache/
 
-# Pipeline: downloaded raw files and generated output (published by CI, never committed)
+# Pipeline: downloaded raw files and generated output (published by CI, never
+# committed). The CLI writes data/ and out/ where it is run (usually android/);
+# pipeline/ held them when the pipeline was Python.
+android/data/
+android/out/
 pipeline/data/
 pipeline/out/
 
