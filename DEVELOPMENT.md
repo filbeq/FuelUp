@@ -228,7 +228,7 @@ system's Settings → Apps → FuelUp → Language.
 |---|---|
 | `java/…/MainActivity.kt` | Entry point: initialises MapLibre, sets the theme |
 | `java/…/ui/FuelUpApp.kt` | Screens and back stack (Navigation 3: settings, About drawn over the map, which stays alive underneath); keeps the camera and the selected station |
-| `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices, "Update data now"; link to About |
+| `java/…/ui/settings/SettingsScreen.kt` | Theme, map style and language choices, "Update data now" with the data source; link to About |
 | `java/…/ui/settings/SettingsViewModel.kt` | Saves theme/map style; applies theme and language through AppCompat |
 | `java/…/data/AppSettings.kt` | Theme and map-style settings and their SharedPreferences store |
 | `java/…/ui/map/MapScreen.kt` | Full-screen map, station sheet (non-modal) or side panel on wide windows, credits that follow them, status bar icons |
@@ -248,9 +248,10 @@ system's Settings → Apps → FuelUp → Language.
 | `java/…/data/DataDateLabel.kt` | How the data date reads ("yesterday", or weekday and date) and when it counts as late |
 | `java/…/ui/map/DataDateText.kt` | That wording in the app language (date pill, Settings) and the clock that updates it |
 | `java/…/data/StationData.kt` | Kotlin mirror of the published JSON (schema v1) + parser |
-| `java/…/data/StationRepository.kt` | Download, validation, file cache |
-| `java/…/data/RefreshPolicy.kt` | When to contact the server |
-| `java/…/data/DataSource.kt` | Where the data is published (one URL) |
+| `java/…/data/StationRepository.kt` | Picks the source (published copy or MIMIT), downloads, cleans MIMIT's files with `:core`, validates, file cache |
+| `java/…/data/RefreshPolicy.kt` | When to contact a server |
+| `java/…/data/DataSource.kt` | The two sources: the published copy (GitHub Pages) and MIMIT's two files; `DataOrigin` |
+| `java/…/data/RemoteFetcher.kt` | HTTP downloads (`HttpURLConnection`, gzip, timeouts, `Range` for MIMIT's date line) |
 | `java/…/map/StationLayers.kt` | Stations as clustered markers (count in the circle, "from" price pill), selection ring, tap handling (cluster or pill → zoom in, station → select) |
 | `java/…/map/LabelLanguage.kt` | Map place names in the app language |
 | `java/…/map/StationIcons.kt` | Marker icons per price class (colour + shape), also used by the legend |
@@ -275,21 +276,69 @@ system's Settings → Apps → FuelUp → Language.
 | `res/xml/locales_config.xml` | Languages offered in Android 13+ settings |
 | `res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml` | What Android backs up: only the favourites |
 
+The data pipeline, outside the app module (both plain Kotlin/JVM, no Android):
+
+| Path (under `android/`) | What it does |
+|---|---|
+| `core/src/main/kotlin/…/core/MimitFile.kt` | Reads MIMIT's files: header date, pipe-separated rows, format errors |
+| `core/…/Stations.kt`, `core/…/Prices.kt` | Parse and clean the two files (quirks, drops, bounds) |
+| `core/…/Fuels.kt` | Fuel names → enum, unit, standard/special |
+| `core/…/Build.kt` | Join, misplaced-coordinate check, safety checks, JSON output |
+| `core/…/DropReport.kt` | What was dropped, by reason, with sample ids |
+| `core/src/test/` | Unit tests on fixture CSVs with the real quirks; the golden test against the app's fixture |
+| `cli/src/main/kotlin/…/cli/Main.kt` | `fuel-data`: download (3 attempts), clean, write `out/`; run by the publish workflow |
+
 ### Station data: download, cache, refresh
 
 On start the app shows the cached data at once, then decides whether to
-contact the server (`data/RefreshPolicy.kt`):
+contact a server (`data/RefreshPolicy.kt`, `data/StationRepository.kt`). There
+are two sources: **MIMIT's two CSV files** (7.5 MB, not compressed), cleaned on
+the phone by `android/core`, and **FuelUp's published copy** on GitHub Pages
+(1.5 MB compressed), built from the same files by the same code. MIMIT answers
+only Italian IP addresses (since 16 Oct 2026, issue #4), so the published copy
+is the fallback for everyone else, and it is stale while MIMIT also blocks
+GitHub.
 
-1. No cache → download (`meta.json`, then `stations.json`).
-2. The cache already holds **yesterday's** data → no network at all: MIMIT
+1. The cache already holds **yesterday's** data → no network at all: MIMIT
    publishes day D's prices on the morning of D+1, so nothing newer exists.
-3. Otherwise fetch `meta.json` (≈400 bytes) at most **once an hour**; the
-   Retry button ignores this limit.
-4. Download `stations.json` only if `meta.json` has a different date or
-   checksum; check size, SHA-256, schema version and date, parse it, and only
-   then replace the cache (`files/data/` in the app's private storage).
-5. A `schemaVersion` the app doesn't know → keep the cache and ask the user to
-   update the app.
+   Otherwise a server is asked at most **once an hour** (Retry ignores this
+   limit); no cache → always.
+2. **Published copy first:** fetch its `meta.json` (≈400 bytes). If it holds
+   the newest possible date, download it (if date or checksum differ from the
+   cache). Same date on both sides → always this one, it's smaller.
+3. **Else MIMIT:** read only the first line of the prices file
+   (`Range: bytes=0-63`, `Estrazione del YYYY-MM-DD`, 0.3–0.4 s). If MIMIT's
+   date is newer than both the cache and the published copy, download both
+   files, clean them (same safety checks as the publish workflow: a
+   suspicious file is refused), and write `stations.json` + `meta.json` as
+   if downloaded.
+4. **Else the published copy** if it is newer than the cache (MIMIT gave no
+   answer, as from abroad, or its files failed the checks).
+5. Every download is checked (size, SHA-256, schema version, date) and parsed
+   before it replaces the cache (`files/data/` in the app's private storage),
+   so a bad download never breaks what the app has. A `schemaVersion` the app
+   doesn't know → keep the cache and ask the user to update the app.
+
+The cache also records where it came from (`origin`, missing = published
+copy) and when a server last answered (`last_meta_check`). Settings → Data
+shows the source ("Fonte: scaricati dal Ministero (MIMIT)" / "Fonte: copia
+pubblicata da FuelUp"), plus a note when MIMIT gave no answer in this session
+("The Ministry only answers connections from Italy…"). About explains both
+sources. The outcome shown is "offline" only when neither source answered.
+
+**Users abroad.** Foreign tourists in Italy on their home SIM (roaming usually
+exits through the home country), VPN users and Italians on foreign Wi-Fi reach
+only the published copy. Italians roaming in the EU usually exit through
+Italy. While MIMIT also blocks GitHub, they see the copy's date with the
+neutral "Update delayed" line, plus the note in Settings. The app never
+uploads anything from phones to fill the gap.
+
+**An Italian host, if ever needed:** a small Italian VPS would run a scheduled
+script (cron) that executes the CLI and publishes the result; how it
+publishes, and with which narrowly scoped credential, is decided then. It
+never becomes a self-hosted GitHub runner: the repository is public, and
+GitHub advises against self-hosted runners for public repositories (any pull
+request could run code on the machine).
 
 **Data date label** (`data/DataDateLabel.kt`, the date pill). In Italian time:
 "Prezzi di ieri" / "Yesterday's prices" when the data is yesterday's (the newest
@@ -310,11 +359,11 @@ both clock changes. About says that MIMIT publishes each morning the prices in
 force at 08:00 on the previous day. To see the other states on a phone, shift
 `Instant.now()` in `DataStatusCard.kt` for a test build (don't commit it).
 
-**Update data now** (Settings → Data) skips rules 2 and 3: it always fetches
-`meta.json`, then follows rules 4 and 5, and shows the outcome (updated / already
-up to date / offline / error) and when the server was last checked.
+**Update data now** (Settings → Data) skips rule 1: it always asks, then
+follows rules 2–5, and shows the outcome (updated / already up to date /
+offline / error) and when a server was last checked.
 
-Timeouts: 15 s to connect, 30 s per read; a timeout shows the offline state.
+Timeouts: 10 s to connect, 30 s per read; a timeout counts as no answer.
 
 **Known limitation:** because of rule 2, a dataset **republished for the same
 date** (for example after fixing a pipeline bug) does not reach phones that
@@ -347,6 +396,26 @@ Release builds will be faster.
 | Build the search index (background, once per download) | ~1 s, +5 MB Java heap (3 Oct 2026) |
 | Search per keystroke (21.5k stations) | 4–10 ms; up to ~70 ms for a 2-letter query matching thousands (3 Oct 2026) |
 | Back from Settings/About to the map | before: map rebuilt, 1.04–2.16 s (median 1.27 s, 10 runs) until fully drawn; now: no redraw needed, the map is complete in every frame of the ~0.5 s fade (3 Oct 2026) |
+
+**Direct download from MIMIT vs the published copy** (debug build, same
+phone, Wi-Fi, 22 Oct 2026):
+
+| | From MIMIT | From the published copy |
+|---|---|---|
+| Download | 7.5 MB: prices 1.6–4.3 s + stations 1.8–3.6 s | 1.5 MB: 0.4–0.8 s |
+| Date check | 0.27–0.39 s (first line, `Range`) | `meta.json` ~0.5 s |
+| Cleaning (`:core`) | 2.6–2.7 s (parse stations ~0.9–1.0 s, prices ~1.2–1.3 s, join ~0.2 s, write ~0.3–0.4 s) | – |
+| Parse the result | 0.53–0.55 s | 0.6–0.7 s |
+| Whole refresh | 7.2–11.6 s | ~2 s |
+| Java heap right after cleaning | 44–62 MB (16 MB kept afterwards) | 16 MB kept |
+| CPU per cold start (whole app) | 16.5–19.9 s | 10.8–11.0 s |
+| Battery (batterystats estimate) | 2.13 mAh over 5 runs, incl. the launch GPS fix | 0.67 mAh over 3 runs |
+
+A direct refresh costs about 6–8 s more CPU, under 0.25 mAh (~0.005% of the
+battery), once a day at most. The first port cleaned in 18.5 s on the phone:
+regexes, `BigDecimal` (slow on Android) and too many distance calls in the
+misplaced check were replaced by exact equivalents. Not measured yet: the
+same on mobile data.
 
 To see the timings yourself: `adb logcat -s FuelUpPerf` (debug builds only).
 Debug builds also enable StrictMode, which logs any disk or network access on

@@ -37,6 +37,11 @@ small enough to be tested on a real phone before moving on.
   - metadata PDF: `Metadati_prezzi_carburanti_20260128.pdf`, linked from the
     dataset page: file dated 28 Jan 2026, format **in force since 10 Feb 2026**
     (as the dataset page states)
+- **Since 16 Oct 2026 MIMIT answers only Italian IP addresses** (issue #4):
+  from anywhere else, including GitHub's runners and other EU countries, the
+  connection times out. So the app downloads MIMIT directly, and FuelUp's
+  published copy (GitHub Pages) is the fallback, stale while the block lasts.
+  An email to MIMIT asking about it is drafted in issue #4 (the owner sends it).
 - Reporting rule (MIMIT, legal basis art. 51 L. 99/2009): operators report
   prices **weekly, and whenever a price rises or falls**. A price not
   re-reported for days is usually just unchanged: show its age neutrally,
@@ -402,8 +407,23 @@ small enough to be tested on a real phone before moving on.
 - MapLibre's library manifest also declares `ACCESS_WIFI_STATE`: removed in
   our manifest (`tools:node="remove"`).
 - No API keys or secrets are needed by the app.
-- Data: download the published JSON at most once a day, cache it on device,
-  work offline from cache, show the data date and a clear error state.
+- Data (issue #4, 0.3.0): at most one refresh a day, cached on device, works
+  offline from cache, shows the data date and a clear error state. Two
+  sources (`data/StationRepository.kt`, rules in DEVELOPMENT.md "Station
+  data"): the published copy when it holds the newest possible date (1.5 MB;
+  also when both have the same date); else MIMIT's two CSVs (7.5 MB, date
+  checked first via `Range: bytes=0-63`) cleaned on the phone by
+  `android/core` with the same safety checks, when newer than cache and copy;
+  else the copy if newer than the cache. Any network, no Wi-Fi-only setting.
+  Settings → Data shows the source ("Fonte: scaricati dal Ministero (MIMIT)" /
+  "copia pubblicata da FuelUp") and a note when MIMIT gave no answer; About
+  explains both. Cost of a direct refresh: ~7–12 s, 2.6 s of it cleaning,
+  ~6–8 s more CPU, < 0.25 mAh (DEVELOPMENT.md "Performance").
+  Users abroad (foreign SIMs roaming, VPNs, foreign Wi-Fi) get only the copy;
+  the app never uploads anything from phones. If an Italian VPS is ever
+  rented, it runs a scheduled script (cron) that executes the CLI and
+  publishes; never a self-hosted GitHub runner (public repo: unsafe, GitHub
+  advises against it).
   Data date label (step 8.10, issue #2, `data/DataDateLabel.kt`): Italian
   time; "Prezzi di ieri" for yesterday's data, else short weekday + date
   ("Prezzi di mar 06/10"; no time, always 08:00; short so the pill and the
@@ -411,7 +431,7 @@ small enough to be tested on a real phone before moving on.
   never a warning for the newest possible data
   (the day before yesterday until the morning publication); a neutral second
   line "Aggiornamento in ritardo" only when older than expected, with the
-  freshness checker's 14:00 deadline. Re-evaluated at midnight, 14:00 and on
+  freshness alarm's 14:00 deadline. Re-evaluated at midnight, 14:00 and on
   resume. About explains MIMIT publishes the previous day's 08:00 prices each
   morning. Settings' "Update data now" results use the same words
   (`ui/map/DataDateText.kt`, "Già aggiornato (prezzi di ieri)").
@@ -420,14 +440,16 @@ small enough to be tested on a real phone before moving on.
     `List<LongArray>` (no boxing)
   - cache: plain files in `filesDir/data/` (not Room: the whole dataset is
     needed in memory, no queries); a download is checked against meta.json
-    (size, SHA-256, schema, date) before atomically replacing the cache
+    (size, SHA-256, schema, date) before atomically replacing the cache;
+    `origin` file records the source (missing = published copy)
   - background work: loaded on app start by a ViewModel with coroutines (no
     WorkManager: data only matters while the app is open)
-  - network: `HttpURLConnection` (gzip built in), 15 s connect / 30 s read
-    timeouts; a timeout counts as offline
+  - network: `HttpURLConnection` (gzip built in), 10 s connect / 30 s read
+    timeouts; a timeout counts as no answer ("offline" only if neither
+    source answered); explicit `INTERNET` permission
   - refresh rule (`RefreshPolicy`): no network if the cache already has
-    yesterday's data; otherwise check meta.json at most hourly (Retry
-    overrides); download stations.json only if date or checksum changed
+    yesterday's data; otherwise ask at most hourly (Retry overrides);
+    download only if date or checksum changed
   - "Update data now" (Settings → Data, step 8.2): always fetches meta.json
     (ignores the hourly limit and the same-date rule), downloads only if date or
     checksum changed, shows the outcome and when the server was last checked
@@ -564,19 +586,17 @@ rightly showed "Aggiornamento in ritardo" at 14:28; needs a manual run of
 
 Next: the rest of step 8 (see the backlog below).
 
-### Issue #4 status (2026-10-22, in progress)
+### Issue #4 (done 2026-10-23, in 0.3.0)
 
-MIMIT answers only Italian IPs since 16 Oct 2026, so GitHub can't publish.
-Plan steps 0–6 are done: cleaning ported to `android/core` (identical to the
-Python pipeline on 182 archive days), `android/cli`, and the app downloads
-MIMIT directly with the Pages copy as fallback and shows the source in Settings.
-Steps 5–6 (22 Oct) were folded into a leaner CI/CD: publish with the CLI,
-Python cleaning removed, alarm merged into publish, backoff, CI path filters
-(see "Pipeline" above). Verified on GitHub: dry run green with the block
-warning; manual run builds the CLI, fails at the blocked download. Step 7
-(remaining docs: code map, data flow, release notes 0.3.0) is left, plus the
-open checks. Full plan, decisions, measurements and what's left:
-https://github.com/filbeq/FuelUp/issues/4#issuecomment-6351286850
+MIMIT answers only Italian IPs since 16 Oct 2026. Done: cleaning ported to
+`android/core` (identical to the Python pipeline on 182 archive days), the
+`fuel-data` CLI, direct MIMIT download in the app with the published copy as
+fallback, data source in Settings (checked on the phone in light/dark theme,
+portrait/landscape), lean CI/CD (see "Pipeline"), docs. Left over, not
+blocking: the mobile-data measurement, the "MIMIT gave no answer" note and
+airplane-mode → offline on a device (unit-tested only; the note needs a
+non-Italian network), and the MIMIT email (owner). Plan, measurements and
+decisions: https://github.com/filbeq/FuelUp/issues/4#issuecomment-6351286850
 
 ### Open issues (known, not yet fixed)
 
