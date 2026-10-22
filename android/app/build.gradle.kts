@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive)
     implementation(libs.maplibre.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(project(":core"))
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

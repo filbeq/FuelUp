@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FuelUp"
 include(":app")
+include(":core")

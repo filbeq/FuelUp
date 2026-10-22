@@ -36,3 +36,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 # and sets the Kotlin version used for the whole build.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+# Plain Kotlin/JVM modules (no Android), e.g. :core.
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
