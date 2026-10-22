@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Prices: from MIMIT and from the copy published on GitHub Pages; map tiles.
+         (MapLibre declares it too, but the app must not depend on that.) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- "My location": asked when the button is tapped, foreground only (no
          background location). Approximate is enough; precise is asked too because
          on Android 11 and older approximate-only apps can't use GPS (on 12+ the

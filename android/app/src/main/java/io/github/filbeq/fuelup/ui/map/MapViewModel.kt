@@ -45,6 +45,8 @@ data class MapUiState(
     val ranking: Map<Int, RankedPrice> = emptyMap(),
     /** When the server was last asked for new data (null = never). */
     val lastChecked: Instant? = null,
+    /** The last attempt to reach MIMIT got no answer (as from outside Italy); null = not tried yet. */
+    val mimitUnreachable: Boolean? = null,
     /** "Update data now" in Settings. */
     val manualUpdate: ManualUpdate = ManualUpdate.Idle,
     /** Search over [snapshot]; null until built (off the main thread, after the map data). */
@@ -196,6 +198,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val current = _state.value.snapshot
         val (result, lastChecked) = withContext(Dispatchers.IO) {
             val result = PerfLog.timeWithHeap("refresh") { repository.refresh(current, force, manual) }
+            (result as? RefreshResult.Updated)?.let { PerfLog.log("data from ${it.snapshot.origin}") }
             result to repository.lastMetaCheck()
         }
         val choice = _state.value.choice
@@ -213,7 +216,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 RefreshResult.Offline -> it.copy(status = DataStatus.Offline)
                 RefreshResult.Failed -> it.copy(status = DataStatus.Failed)
                 RefreshResult.UpdateRequired -> it.copy(status = DataStatus.UpdateRequired)
-            }.copy(lastChecked = lastChecked)
+            }.copy(lastChecked = lastChecked, mimitUnreachable = repository.mimitUnreachable ?: it.mimitUnreachable)
         }
         if (result is RefreshResult.Updated) {
             refreshFavorites(result.snapshot)
