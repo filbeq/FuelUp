@@ -24,6 +24,7 @@ Only the first ~200 bytes of the MIMIT prices file are read (its
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -32,8 +33,12 @@ from datetime import UTC, date, datetime, time, timedelta
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
-from fuel_pipeline.csvfile import EXTRACTION_RE
-from fuel_pipeline.download import PRICES_URL, USER_AGENT
+# Verified on the official dataset page on 2026-10-01:
+# https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti
+PRICES_URL = "https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv"
+USER_AGENT = "fuel-up-freshness/0.2 (open data reuse; Python urllib)"
+# First line of every MIMIT file.
+EXTRACTION_RE = re.compile(r"^Estrazione del (\d{4}-\d{2}-\d{2})\s*$")
 
 PUBLISHED_META_URL = "https://filbeq.github.io/FuelUp/meta.json"
 ITALY = ZoneInfo("Europe/Rome")

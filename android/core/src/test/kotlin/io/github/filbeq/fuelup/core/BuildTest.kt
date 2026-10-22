@@ -111,14 +111,20 @@ class BuildTest {
     }
 
     /**
-     * The files match, byte for byte, the app's test fixture, which the Python
-     * pipeline generated: the published format is unchanged.
+     * The files match, byte for byte, the app's test fixture (first generated
+     * by the former Python pipeline): the published format is unchanged, so
+     * the app's tests still describe what is published. After an intended
+     * format change: `./gradlew :core:test -PupdateAppFixture`, then rerun
+     * the app's tests.
      */
     @Test
     fun outputMatchesTheAppFixture() {
         val out = tmp.newFolder()
         val meta = writeOutput(doc, out, generatedAt = Instant.parse("2026-10-01T07:12:03Z"))
         val golden = File("../app/src/test/resources/fixtures")
+        if (System.getProperty("updateAppFixture") == "true") {
+            listOf("meta.json", "stations.json").forEach { File(out, it).copyTo(File(golden, it), overwrite = true) }
+        }
         assertArrayEquals(File(golden, "stations.json").readBytes(), File(out, "stations.json").readBytes())
         assertEquals(File(golden, "meta.json").readText(), File(out, "meta.json").readText())
         assertEquals(listOf("meta.json", "stations.json"), out.list()!!.sorted())

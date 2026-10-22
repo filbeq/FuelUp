@@ -19,3 +19,12 @@ kotlin {
 dependencies {
     testImplementation(libs.junit)
 }
+
+// ./gradlew :core:test -PupdateAppFixture rewrites the app's test fixture
+// (app/src/test/resources/fixtures/*.json) from this module's output, after an
+// intended change of the published format.
+tasks.test {
+    val update = providers.gradleProperty("updateAppFixture").isPresent
+    inputs.property("updateAppFixture", update)
+    systemProperty("updateAppFixture", update)
+}

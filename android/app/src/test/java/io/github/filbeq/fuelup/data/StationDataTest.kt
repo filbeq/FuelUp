@@ -7,9 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Parses the files produced by the data pipeline from its own test fixtures
- * (regenerate with pipeline/scripts/make_android_fixture.py), so a format change
- * on either side breaks this test.
+ * Parses the files the data pipeline (android/core) builds from its own test
+ * fixtures (regenerate with `./gradlew :core:test -PupdateAppFixture`), so a
+ * format change on either side breaks this test.
  */
 class StationDataTest {
     private fun fixture(name: String) =

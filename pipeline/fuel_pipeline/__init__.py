@@ -1,1 +1,5 @@
-"""Pipeline that turns the MIMIT fuel price open data into a compact JSON file."""
+"""Monitoring of the published data: is it up to date with MIMIT?
+
+The data itself is built by the Kotlin CLI (android/cli, cleaning in
+android/core).
+"""
