@@ -347,6 +347,10 @@ small enough to be tested on a real phone before moving on.
   contact GitHub; must be off in a Play build): maybe later.
 - Theme: fixed FuelUp light/dark palette, light or dark per the Theme setting
   (system default unless chosen in Settings); no dynamic colour.
+  The window theme sets `android:forceDarkAllowed="false"` (issue #5): MIUI's
+  "dark mode for apps" (and Android 10+ force dark) recoloured Compose text
+  near-white on light surfaces in the light theme; MIUI honours the opt-out
+  (checked on the phone).
 - Compass (step 8.8): MapLibre's own compass is off (it sat under the search
   bar, untappable). Our `ui/map/CompassButton.kt`: 40 dp round button, same
   surface and 2 dp shadow as the other controls, centred 12 dp above the

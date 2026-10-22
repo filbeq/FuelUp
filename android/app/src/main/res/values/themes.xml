@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Window theme only: the UI itself is styled by Compose (ui/theme).
          AppCompat-based so that AppCompatDelegate can switch the app language
          (also on Android < 13) and light/dark mode. DayNight picks light or
          dark from the current mode; window_background has a night variant. -->
     <style name="Theme.FuelUp" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
+        <!-- FuelUp has its own light and dark themes: no system "force dark"
+             (Android 10+; MIUI's dark mode for apps) recolouring them. It made
+             text near-white on light fields in the light theme (issue #5). -->
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
     </style>
 </resources>
