@@ -26,6 +26,10 @@ small enough to be tested on a real phone before moving on.
   privacy, credits); developer instructions go in `DEVELOPMENT.md`.
 - Never commit secrets (API keys, keystores, `local.properties`). Keep
   `.gitignore` up to date for both Python and Android/Gradle.
+- Never post personal data or outgoing-mail text on GitHub (issues, comments,
+  PRs, commits, files): no real name, contact details or email drafts. Keep
+  drafts as local files outside the repo for the owner. Use the handle
+  filbeq.
 - All code, identifiers, comments, docs and commit messages in English.
 
 ## Data source (MIMIT open data)
@@ -41,7 +45,7 @@ small enough to be tested on a real phone before moving on.
   from anywhere else, including GitHub's runners and other EU countries, the
   connection times out. So the app downloads MIMIT directly, and FuelUp's
   published copy (GitHub Pages) is the fallback, stale while the block lasts.
-  An email to MIMIT asking about it is drafted in issue #4 (the owner sends it).
+  The owner may email MIMIT about it (draft kept locally, never on GitHub).
 - Reporting rule (MIMIT, legal basis art. 51 L. 99/2009): operators report
   prices **weekly, and whenever a price rises or falls**. A price not
   re-reported for days is usually just unchanged: show its age neutrally,
@@ -595,8 +599,8 @@ fallback, data source in Settings (checked on the phone in light/dark theme,
 portrait/landscape), lean CI/CD (see "Pipeline"), docs. Left over, not
 blocking: the mobile-data measurement, the "MIMIT gave no answer" note and
 airplane-mode → offline on a device (unit-tested only; the note needs a
-non-Italian network), and the MIMIT email (owner). Plan, measurements and
-decisions: https://github.com/filbeq/FuelUp/issues/4#issuecomment-6351286850
+non-Italian network), and the MIMIT email (owner). Summary:
+https://github.com/filbeq/FuelUp/issues/4#issuecomment-6352768261
 
 ### Open issues (known, not yet fixed)
 
